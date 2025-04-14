@@ -42,6 +42,11 @@ diagnostic-center-billing-app
    npm start
    ```
 
+5. **Production Exe**
+   ```bash
+   npm run dist
+   ```
+
 ## Usage
 Upon starting the application, the login page will be displayed. Users can enter their username and password to access the billing features.
 
