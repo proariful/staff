@@ -8,8 +8,7 @@ dist/win-unpacked/
 # Logs
 *.log
 
-# Node.js dependencies
-node_modules/
+
 
 # OS-specific files
 .DS_Store
