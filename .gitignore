@@ -5,6 +5,8 @@ find . -type f -size +100M | sed 's|^\./||' >> .gitignore
 dist/
 dist/win-unpacked/
 
+node_modules/
+
 # Logs
 *.log
 
