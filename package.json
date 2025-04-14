@@ -1,0 +1,64 @@
+{
+  "name": "bissoy-diagnostic-manager",
+  "version": "1.0.0",
+  "description": "Bissoy Diagnostic Manager.",
+  "main": "main.js",
+  "scripts": {
+    "start": "npx electron .",
+    "build": "tsc",
+    "dev": "tsc -w",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "electron": "^25.3.1",
+    "electron-builder": "^26.0.12",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.2.2"
+  },
+  "keywords": [
+    "diagnostic",
+    "billing",
+    "electron",
+    "typescript"
+  ],
+  "author": "Bissoy.com",
+  "license": "MIT",
+  "build": {
+    "appId": "com.bissoydiagnoctic.manager",
+    "productName": "Bissoy Diagnostic Manager",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "user_data.db",
+      "src/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "./user_data.db",
+        "to": "./user_data.db"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    },
+    "asar": true,
+    "asarUnpack": [
+      "**/*.dll",
+      "**/*.dylib"
+    ],
+    "npmRebuild": false,
+    "forceCodeSigning": false
+  }
+}

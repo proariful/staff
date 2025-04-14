@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bissoy Diagnostic Manager</title>
+</head>
+<body>
+  <h1>Welcome to the Bissoy Diagnostic Manager</h1>
+  <nav>
+    <button id="save-user-menu">Save User</button>
+    <button id="view-users-menu">View Users</button>
+  </nav>
+  <section id="save-user-section">
+    <form id="user-form">
+      <label for="first-name">First Name:</label>
+      <input type="text" id="first-name" name="first-name" required>
+      <br>
+      <label for="last-name">Last Name:</label>
+      <input type="text" id="last-name" name="last-name" required>
+      <br>
+      <button type="submit">Save</button>
+    </form>
+    <p id="save-message"></p>
+  </section>
+  <section id="view-users-section" style="display: none;">
+    <h2>All Users</h2>
+    <ul id="user-list"></ul>
+  </section>
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    document.getElementById('save-user-menu').addEventListener('click', () => {
+      document.getElementById('save-user-section').style.display = 'block';
+      document.getElementById('view-users-section').style.display = 'none';
+    });
+
+    document.getElementById('view-users-menu').addEventListener('click', () => {
+      ipcRenderer.send('get-users');
+      document.getElementById('save-user-section').style.display = 'none';
+      document.getElementById('view-users-section').style.display = 'block';
+    });
+
+    document.getElementById('user-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const firstName = document.getElementById('first-name').value;
+      const lastName = document.getElementById('last-name').value;
+
+      ipcRenderer.send('save-user', { firstName, lastName });
+    });
+
+    ipcRenderer.on('save-user-response', (event, { success, message }) => {
+      const messageElement = document.getElementById('save-message');
+      messageElement.textContent = message;
+      messageElement.style.color = success ? 'green' : 'red';
+    });
+
+    ipcRenderer.on('get-users-response', (event, users) => {
+      const userList = document.getElementById('user-list');
+      userList.innerHTML = '';
+      users.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = `${user.firstName} ${user.lastName}`;
+        userList.appendChild(li);
+      });
+    });
+  </script>
+</body>
+</html>
