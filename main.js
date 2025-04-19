@@ -127,13 +127,24 @@ function insertTrackingData() {
     }
 
     // Reset counters
-    timerSeconds = 0;
-    keystrokes = 0;
-    mouseMovements = 0;
-    mouseClicks = 0;
-
-    console.log('Counters reset to 0 after data insertion.');
+    resetCounters();
   });
+}
+
+// Function to reset counters
+function resetCounters() {
+  timerSeconds = 0;
+  keystrokes = 0;
+  mouseMovements = 0;
+  mouseClicks = 0;
+
+  // Notify the Python process about the reset
+  if (pythonProcess && pythonProcess.stdin.writable) {
+    pythonProcess.stdin.write(JSON.stringify({ type: 'reset' }) + '\n');
+  }
+
+  // Log the reset values to confirm
+  console.log('Counters reset:', { timerSeconds, keystrokes, mouseMovements, mouseClicks });
 }
 
 // Function to check if it's time to insert data
@@ -168,10 +179,7 @@ function checkInactivity() {
       }
 
       // Reset counters
-      timerSeconds = 0;
-      keystrokes = 0;
-      mouseMovements = 0;
-      mouseClicks = 0;
+      resetCounters();
 
       // Notify the renderer process to toggle the "Stop" button
       mainWindow.webContents.send('inactivity-detected');
@@ -232,10 +240,7 @@ function stopPythonTracking() {
 
 // Function to start the timer
 function startTimer() {
-  timerSeconds = 0;
-  keystrokes = 0;
-  mouseMovements = 0;
-  mouseClicks = 0;
+  resetCounters();
   nextInsertTime = calculateNextInsertTime(); // Calculate the first insert time
   mainWindow.webContents.send('timer-update', '00:00'); // Send initial timer value to the renderer
 
@@ -385,10 +390,7 @@ app.on('window-all-closed', () => {
       }
 
       // Reset counters
-      timerSeconds = 0;
-      keystrokes = 0;
-      mouseMovements = 0;
-      mouseClicks = 0;
+      resetCounters();
 
       // Quit the app
       if (process.platform !== 'darwin') {
