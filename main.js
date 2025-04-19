@@ -289,10 +289,43 @@ ipcMain.on('fetch-reports', (event) => {
 });
 
 app.on('window-all-closed', () => {
-  stopTimer();
-  stopPythonTracking();
-  if (process.platform !== 'darwin') {
-    app.quit();
+  if (timerInterval || pythonProcess) {
+    console.log('App is closing. Stopping timer and saving tracking data.');
+
+    // Stop the timer
+    stopTimer();
+
+    // Stop the Python tracking process
+    stopPythonTracking();
+
+    // Insert tracking data into the database
+    const startTime = new Date().toISOString(); // Use current time if no start time is available
+    db.run(`
+      INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
+      VALUES (?, ?, ?, ?, ?)
+    `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+      if (err) {
+        console.error('Error inserting tracking data on app close:', err.message);
+      } else {
+        console.log('Tracking data saved successfully on app close.');
+      }
+
+      // Reset counters
+      timerSeconds = 0;
+      keystrokes = 0;
+      mouseMovements = 0;
+      mouseClicks = 0;
+
+      // Quit the app
+      if (process.platform !== 'darwin') {
+        app.quit();
+      }
+    });
+  } else {
+    // Quit the app directly if no timer or tracking is active
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
   }
 });
 
