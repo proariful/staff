@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification } = require('electron');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
@@ -11,6 +11,8 @@ let timerSeconds = 0;
 let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
+let lastActivityTime = Date.now(); // Track the last activity time
+const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes in milliseconds
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -102,6 +104,43 @@ app.on('ready', () => {
   mainWindow.loadFile('index.html');
 });
 
+// Function to check for inactivity
+function checkInactivity() {
+  const currentTime = Date.now();
+  if (currentTime - lastActivityTime >= INACTIVITY_LIMIT) {
+    console.log('Inactivity detected. Stopping timer and saving data.');
+
+    // Stop the timer and tracking
+    stopTimer();
+    stopPythonTracking();
+
+    // Insert tracking data into the database
+    const startTime = new Date().toISOString(); // Use current time if no start time is available
+    db.run(`
+      INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
+      VALUES (?, ?, ?, ?, ?)
+    `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+      if (err) {
+        console.error('Error inserting tracking data on inactivity:', err.message);
+      } else {
+        console.log('Tracking data saved successfully on inactivity.');
+      }
+
+      // Reset counters
+      timerSeconds = 0;
+      keystrokes = 0;
+      mouseMovements = 0;
+      mouseClicks = 0;
+
+      // Send a notification
+      new Notification({
+        title: 'Inactivity Detected',
+        body: 'Timer stopped due to inactivity. Data has been saved.',
+      }).show();
+    });
+  }
+}
+
 // Function to start the Python process
 function startPythonTracking() {
   const pythonScriptPath = path.join(__dirname, 'input_tracker.py');
@@ -111,6 +150,7 @@ function startPythonTracking() {
     const message = data.toString().trim();
     try {
       const event = JSON.parse(message);
+      lastActivityTime = Date.now(); // Update the last activity time on any event
       if (event.type === 'keystroke') {
         keystrokes = event.count;
         mainWindow.webContents.send('keystroke-update', keystrokes);
@@ -149,6 +189,7 @@ function stopPythonTracking() {
 // Function to start the timer
 function startTimer() {
   timerSeconds = 0;
+  lastActivityTime = Date.now(); // Reset the last activity time
   const startTime = new Date().toISOString();
   mainWindow.webContents.send('timer-update', '00:00');
 
@@ -157,6 +198,9 @@ function startTimer() {
     const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
     const seconds = String(timerSeconds % 60).padStart(2, '0');
     mainWindow.webContents.send('timer-update', `${minutes}:${seconds}`);
+
+    // Check for inactivity
+    checkInactivity();
   }, 1000);
 
   return startTime;
