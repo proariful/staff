@@ -379,6 +379,66 @@ ipcMain.on('fetch-reports', (event) => {
   });
 });
 
+// Function to calculate total active times
+function getActiveTimes(callback) {
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
+  const last7DaysStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString();
+  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0).toISOString();
+
+  const queries = {
+    today: `SELECT SUM(timerseconds) AS total FROM tracking WHERE starttime >= ?`,
+    yesterday: `SELECT SUM(timerseconds) AS total FROM tracking WHERE starttime >= ? AND starttime < ?`,
+    last7Days: `SELECT SUM(timerseconds) AS total FROM tracking WHERE starttime >= ?`,
+    thisMonth: `SELECT SUM(timerseconds) AS total FROM tracking WHERE starttime >= ?`,
+    lastMonth: `SELECT SUM(timerseconds) AS total FROM tracking WHERE starttime >= ? AND starttime < ?`,
+  };
+
+  const results = {};
+
+  db.serialize(() => {
+    db.get(queries.today, [todayStart], (err, row) => {
+      results.today = row?.total || 0;
+    });
+
+    db.get(queries.yesterday, [yesterdayStart, todayStart], (err, row) => {
+      results.yesterday = row?.total || 0;
+    });
+
+    db.get(queries.last7Days, [last7DaysStart], (err, row) => {
+      results.last7Days = row?.total || 0;
+    });
+
+    db.get(queries.thisMonth, [thisMonthStart], (err, row) => {
+      results.thisMonth = row?.total || 0;
+    });
+
+    db.get(queries.lastMonth, [lastMonthStart, lastMonthEnd], (err, row) => {
+      results.lastMonth = row?.total || 0;
+
+      // Convert seconds to hours and minutes
+      for (const key in results) {
+        const totalSeconds = results[key];
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        results[key] = `${hours}h ${minutes}m`;
+      }
+
+      callback(results);
+    });
+  });
+}
+
+// Handle fetch-active-times event
+ipcMain.on('fetch-active-times', (event) => {
+  getActiveTimes((results) => {
+    event.reply('active-times-response', results);
+  });
+});
+
 app.on('window-all-closed', () => {
   if (timerInterval || pythonProcess) {
     console.log('App is closing. Stopping timer and saving tracking data.');

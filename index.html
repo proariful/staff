@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bissoy Diagnostic Manager</title>
+  <title>Bissoy Staff Manager</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 <body>
-  <h1>Welcome to the Bissoy Diagnostic Manager</h1>
+  <h1>Welcome to the Bissoy Staff Manager</h1>
   <nav id="nav-bar" style="display: flex; justify-content: space-between; align-items: center;">
     <!-- Welcome message and logout button will be dynamically added here -->
   </nav>
@@ -35,6 +35,14 @@
     <p id="keystroke-display" style="font-size: 18px; margin-top: 10px;">Keystrokes: 0</p>
     <p id="mouse-movement-display" style="font-size: 18px; margin-top: 10px;">Mouse Movements: 0</p>
     <p id="mouse-click-display" style="font-size: 18px; margin-top: 10px;">Mouse Clicks: 0</p>
+    <div id="active-times-display" style="font-size: 18px; margin-top: 20px;">
+      <h3>Total Active Times</h3>
+      <p id="today-active-time">Today: 0h 0m</p>
+      <p id="yesterday-active-time">Yesterday: 0h 0m</p>
+      <p id="last7days-active-time">Last 7 Days: 0h 0m</p>
+      <p id="thismonth-active-time">This Month: 0h 0m</p>
+      <p id="lastmonth-active-time">Last Month: 0h 0m</p>
+    </div>
   </section>
   <section id="reports-section" style="display: none; margin-top: 20px;">
     <h2>Tracking Reports</h2>
@@ -310,6 +318,23 @@
         reportsTableBody.appendChild(row);
       });
     });
+
+    // Fetch and display total active times
+    function fetchActiveTimes() {
+      ipcRenderer.send('fetch-active-times');
+    }
+
+    ipcRenderer.on('active-times-response', (event, results) => {
+      document.getElementById('today-active-time').textContent = `Today: ${results.today}`;
+      document.getElementById('yesterday-active-time').textContent = `Yesterday: ${results.yesterday}`;
+      document.getElementById('last7days-active-time').textContent = `Last 7 Days: ${results.last7Days}`;
+      document.getElementById('thismonth-active-time').textContent = `This Month: ${results.thisMonth}`;
+      document.getElementById('lastmonth-active-time').textContent = `Last Month: ${results.lastMonth}`;
+    });
+
+    // Fetch active times on app load and after tracking stops
+    fetchActiveTimes();
+    ipcRenderer.on('tracking-stopped', fetchActiveTimes);
 
     // Initialize UI
     updateUI();

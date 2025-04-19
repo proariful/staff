@@ -1,7 +1,7 @@
 {
-  "name": "bissoy-diagnostic-manager",
+  "name": "bissoy-staff-manager",
   "version": "1.0.0",
-  "description": "Bissoy Diagnostic Manager.",
+  "description": "Bissoy Staff Manager.",
   "main": "main.js",
   "scripts": {
     "start": "npx electron .",
@@ -21,16 +21,16 @@
     "typescript": "^5.2.2"
   },
   "keywords": [
-    "diagnostic",
-    "billing",
-    "electron",
+    "bissoy",
+    "staff",
+    "manager",
     "typescript"
   ],
   "author": "Bissoy.com",
   "license": "MIT",
   "build": {
-    "appId": "com.bissoydiagnoctic.manager",
-    "productName": "Bissoy Diagnostic Manager",
+    "appId": "com.bissoystaff.manager",
+    "productName": "Bissoy Staff Manager",
     "directories": {
       "output": "dist"
     },
