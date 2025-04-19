@@ -10,11 +10,13 @@
     "dist": "electron-builder"
   },
   "dependencies": {
+    "20": "^1.0.0",
     "sqlite3": "^5.1.6"
   },
   "devDependencies": {
     "electron": "^25.9.8",
     "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
     "ts-loader": "^9.4.4",
     "typescript": "^5.2.2"
   },

@@ -2,8 +2,10 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 let mainWindow;
+let pythonProcess;
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -75,6 +77,34 @@ app.on('ready', () => {
   });
 
   mainWindow.loadFile('index.html');
+
+  // Start the Python script
+  const pythonScriptPath = path.join(__dirname, 'input_tracker.py');
+  pythonProcess = spawn('python', [pythonScriptPath]);
+
+  pythonProcess.stdout.on('data', (data) => {
+    const message = data.toString().trim();
+    try {
+      const event = JSON.parse(message);
+      if (event.type === 'keystroke') {
+        mainWindow.webContents.send('keystroke-update', event.count);
+      } else if (event.type === 'mouseclick') {
+        mainWindow.webContents.send('mouseclick-update', event.count);
+      } else if (event.type === 'mousemove') {
+        mainWindow.webContents.send('mousemove-update', event.count);
+      }
+    } catch (err) {
+      console.error('Failed to parse Python output:', message);
+    }
+  });
+
+  pythonProcess.stderr.on('data', (data) => {
+    console.error(`Python error: ${data}`);
+  });
+
+  pythonProcess.on('close', (code) => {
+    console.log(`Python script exited with code ${code}`);
+  });
 });
 
 // Handle save-user event
@@ -147,7 +177,19 @@ ipcMain.on('logout-user', () => {
   });
 });
 
+// Handle start and stop tracking events from the renderer process
+ipcMain.on('start-tracking', () => {
+  console.log('Tracking started (no functionality implemented)');
+});
+
+ipcMain.on('stop-tracking', () => {
+  console.log('Tracking stopped (no functionality implemented)');
+});
+
 app.on('window-all-closed', () => {
+  if (pythonProcess) {
+    pythonProcess.kill();
+  }
   if (process.platform !== 'darwin') {
     app.quit();
   }
