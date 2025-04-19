@@ -1,8 +1,11 @@
-const { app, BrowserWindow, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, Notification, shell } = require('electron'); // Import shell to open folders
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const screenshot = require('screenshot-desktop'); // Import the screenshot-desktop package
+const os = require('os'); // Import the os module to determine the user's home directory
+const sharp = require('sharp'); // Import the sharp library for image compression
 
 let mainWindow;
 let pythonProcess;
@@ -105,6 +108,61 @@ app.on('ready', () => {
 
   mainWindow.loadFile('index.html');
 });
+
+// Directory to save screenshots
+const screenshotsDir = path.join(userDataPath, 'screenshots');
+if (!fs.existsSync(screenshotsDir)) {
+  fs.mkdirSync(screenshotsDir); // Create the screenshots directory if it doesn't exist
+}
+
+// Function to take a screenshot
+function takeScreenshot() {
+  if (!timerInterval) {
+    console.log('Timer is not running. Skipping screenshot.');
+    return; // Do not take a screenshot if the timer is not running
+  }
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // Format timestamp for filename
+  const screenshotPath = path.join(screenshotsDir, `screenshot-${timestamp}.png`);
+  const compressedPath = path.join(screenshotsDir, `screenshot-${timestamp}-compressed.png`);
+
+  screenshot({ filename: screenshotPath })
+    .then(() => {
+      console.log(`Screenshot saved: ${screenshotPath}`);
+      // Compress the screenshot
+      sharp(screenshotPath)
+        .resize(1280, 720) // Resize to 1280x720 (optional, adjust as needed)
+        .jpeg({ quality: 40 }) // Convert to JPEG with 80% quality
+        .toFile(compressedPath)
+        .then(() => {
+          console.log(`Compressed screenshot saved: ${compressedPath}`);
+          // Send a notification after compressing the screenshot
+          const notification = new Notification({
+            title: 'Screenshot Taken',
+            body: `Compressed screenshot saved at: ${compressedPath}`,
+          });
+
+          // Open the folder when the notification is clicked
+          notification.on('click', () => {
+            shell.showItemInFolder(compressedPath);
+          });
+
+          notification.show();
+
+          // Optionally, delete the original uncompressed screenshot
+          fs.unlinkSync(screenshotPath);
+        })
+        .catch((err) => {
+          console.error('Error compressing screenshot:', err.message);
+        });
+    })
+    .catch((err) => {
+      console.error('Error taking screenshot:', err.message);
+    });
+}
+
+// Start taking screenshots every minute
+setInterval(takeScreenshot, 60 * 1000); // Take a screenshot every 60 seconds
 
 // Function to calculate the next 1-minute interval (for local testing)
 function calculateNextInsertTime() {
