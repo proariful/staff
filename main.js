@@ -44,6 +44,26 @@ db.serialize(() => {
   });
 });
 
+// Create the `login_data` table if it doesn't exist
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS login_data (
+      id INTEGER PRIMARY KEY,
+      user_id INTEGER,
+      username TEXT,
+      full_name TEXT,
+      email TEXT,
+      points INTEGER,
+      balance INTEGER,
+      profile_picture TEXT
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Error creating login_data table:', err.message);
+    }
+  });
+});
+
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -67,8 +87,9 @@ ipcMain.on('save-user', (event, { firstName, lastName }) => {
         console.error('Error inserting user:', err.message); // Log the error
         event.reply('save-user-response', { success: false, message: 'Database error: ' + err.message });
       } else {
-        console.log('User saved successfully:', { firstName, lastName });
-        event.reply('save-user-response', { success: true, message: 'User saved successfully' });
+        const response = { success: true, message: 'User saved successfully', data: { firstName, lastName } };
+        console.log('API Response:', response); // Log the API response
+        event.reply('save-user-response', response);
       }
     }
   );
@@ -81,8 +102,47 @@ ipcMain.on('get-users', (event) => {
       console.error('Error fetching users:', err.message); // Log the error
       event.reply('get-users-response', []);
     } else {
-      console.log('Fetched users:', rows);
+      const response = { success: true, data: rows };
+      console.log('API Response:', response); // Log the API response
       event.reply('get-users-response', rows);
+    }
+  });
+});
+
+// Save login data
+ipcMain.on('save-login-data', (event, userData) => {
+  db.run(`
+    INSERT OR REPLACE INTO login_data (id, user_id, username, full_name, email, points, balance, profile_picture)
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+  `, [userData.id, userData.username, userData.full_name, userData.email, userData.points, userData.balance, userData.profile_picture], (err) => {
+    if (err) {
+      console.error('Error saving login data:', err.message);
+    } else {
+      console.log('Login data saved successfully:', userData);
+    }
+  });
+});
+
+// Retrieve login data
+ipcMain.on('get-login-data', (event) => {
+  db.get(`SELECT * FROM login_data WHERE id = 1`, [], (err, row) => {
+    if (err) {
+      console.error('Error retrieving login data:', err.message);
+      event.reply('login-data-response', null);
+    } else {
+      console.log('Retrieved login data:', row);
+      event.reply('login-data-response', row);
+    }
+  });
+});
+
+// Clear login data on logout
+ipcMain.on('logout-user', () => {
+  db.run(`DELETE FROM login_data WHERE id = 1`, (err) => {
+    if (err) {
+      console.error('Error clearing login data:', err.message);
+    } else {
+      console.log('Login data cleared successfully');
     }
   });
 });
