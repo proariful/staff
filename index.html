@@ -103,8 +103,36 @@
       stopButton.style.display = 'none';
     }
 
-    document.getElementById('start-button').addEventListener('click', startTimer);
-    document.getElementById('stop-button').addEventListener('click', stopTimer);
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+
+    startButton.addEventListener('click', () => {
+      ipcRenderer.send('start-tracking');
+      startButton.style.display = 'none'; // Hide the Start button
+      stopButton.style.display = 'inline-block'; // Show the Stop button
+    });
+
+    stopButton.addEventListener('click', () => {
+      ipcRenderer.send('stop-tracking');
+      stopButton.style.display = 'none'; // Hide the Stop button
+      startButton.style.display = 'inline-block'; // Show the Start button
+    });
+
+    ipcRenderer.on('timer-update', (event, time) => {
+      document.getElementById('timer-display').textContent = time;
+    });
+
+    ipcRenderer.on('keystroke-update', (event, count) => {
+      document.getElementById('keystroke-display').textContent = `Keystrokes: ${count}`;
+    });
+
+    ipcRenderer.on('mouseclick-update', (event, count) => {
+      document.getElementById('mouse-click-display').textContent = `Mouse Clicks: ${count}`;
+    });
+
+    ipcRenderer.on('mousemove-update', (event, count) => {
+      document.getElementById('mouse-movement-display').textContent = `Mouse Movements: ${count}`;
+    });
 
     document.getElementById('login-form').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -226,18 +254,6 @@
         li.textContent = `${user.firstName} ${user.lastName}`;
         userList.appendChild(li);
       });
-    });
-
-    ipcRenderer.on('keystroke-update', (event, count) => {
-      document.getElementById('keystroke-display').textContent = `Keystrokes: ${count}`;
-    });
-
-    ipcRenderer.on('mouseclick-update', (event, count) => {
-      document.getElementById('mouse-click-display').textContent = `Mouse Clicks: ${count}`;
-    });
-
-    ipcRenderer.on('mousemove-update', (event, count) => {
-      document.getElementById('mouse-movement-display').textContent = `Mouse Movements: ${count}`;
     });
 
     // Initialize UI

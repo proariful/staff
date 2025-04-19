@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 
 let mainWindow;
 let pythonProcess;
+let timerInterval = null;
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -77,8 +78,10 @@ app.on('ready', () => {
   });
 
   mainWindow.loadFile('index.html');
+});
 
-  // Start the Python script
+// Function to start the Python process
+function startPythonTracking() {
   const pythonScriptPath = path.join(__dirname, 'input_tracker.py');
   pythonProcess = spawn('python', [pythonScriptPath]);
 
@@ -105,7 +108,39 @@ app.on('ready', () => {
   pythonProcess.on('close', (code) => {
     console.log(`Python script exited with code ${code}`);
   });
-});
+
+  console.log('Python tracking started.');
+}
+
+// Function to stop the Python process
+function stopPythonTracking() {
+  if (pythonProcess) {
+    pythonProcess.kill();
+    pythonProcess = null;
+    console.log('Python tracking stopped.');
+  }
+}
+
+// Function to start the timer
+function startTimer() {
+  let seconds = 0;
+  timerInterval = setInterval(() => {
+    seconds++;
+    const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const remainingSeconds = String(seconds % 60).padStart(2, '0');
+    mainWindow.webContents.send('timer-update', `${minutes}:${remainingSeconds}`);
+  }, 1000);
+  console.log('Timer started.');
+}
+
+// Function to stop the timer
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+    console.log('Timer stopped.');
+  }
+}
 
 // Handle save-user event
 ipcMain.on('save-user', (event, { firstName, lastName }) => {
@@ -179,17 +214,20 @@ ipcMain.on('logout-user', () => {
 
 // Handle start and stop tracking events from the renderer process
 ipcMain.on('start-tracking', () => {
-  console.log('Tracking started (no functionality implemented)');
+  startTimer();
+  startPythonTracking();
+  console.log('Tracking and timer started.');
 });
 
 ipcMain.on('stop-tracking', () => {
-  console.log('Tracking stopped (no functionality implemented)');
+  stopTimer();
+  stopPythonTracking();
+  console.log('Tracking and timer stopped.');
 });
 
 app.on('window-all-closed', () => {
-  if (pythonProcess) {
-    pythonProcess.kill();
-  }
+  stopTimer();
+  stopPythonTracking();
   if (process.platform !== 'darwin') {
     app.quit();
   }
