@@ -13,6 +13,7 @@ let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
 const INACTIVITY_LIMIT = 1 * 30 * 1000; // 10 minutes in milliseconds
+let nextInsertTime = null; // Track the next system time for data insertion
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -104,6 +105,46 @@ app.on('ready', () => {
   mainWindow.loadFile('index.html');
 });
 
+// Function to calculate the next 1-minute interval (for local testing)
+function calculateNextInsertTime() {
+  const now = new Date();
+  const nextTime = new Date(now);
+  nextTime.setMinutes(now.getMinutes() + 1, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
+  return nextTime;
+}
+
+// Function to insert data into the database and reset counters
+function insertTrackingData() {
+  const currentTime = new Date().toISOString();
+  db.run(`
+    INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
+    VALUES (?, ?, ?, ?, ?)
+  `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+    if (err) {
+      console.error('Error inserting tracking data:', err.message);
+    } else {
+      console.log('Tracking data saved successfully at', currentTime);
+    }
+
+    // Reset counters
+    timerSeconds = 0;
+    keystrokes = 0;
+    mouseMovements = 0;
+    mouseClicks = 0;
+
+    console.log('Counters reset to 0 after data insertion.');
+  });
+}
+
+// Function to check if it's time to insert data
+function checkInsertTime() {
+  const now = new Date();
+  if (nextInsertTime && now >= nextInsertTime) {
+    insertTrackingData();
+    nextInsertTime = calculateNextInsertTime(); // Update the next insert time
+  }
+}
+
 // Function to check for inactivity
 function checkInactivity() {
   const currentTime = Date.now();
@@ -192,21 +233,27 @@ function stopPythonTracking() {
 // Function to start the timer
 function startTimer() {
   timerSeconds = 0;
-  lastActivityTime = Date.now(); // Reset the last activity time
-  const startTime = new Date().toISOString();
-  mainWindow.webContents.send('timer-update', '00:00');
+  keystrokes = 0;
+  mouseMovements = 0;
+  mouseClicks = 0;
+  nextInsertTime = calculateNextInsertTime(); // Calculate the first insert time
+  mainWindow.webContents.send('timer-update', '00:00'); // Send initial timer value to the renderer
 
   timerInterval = setInterval(() => {
     timerSeconds++;
     const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
     const seconds = String(timerSeconds % 60).padStart(2, '0');
-    mainWindow.webContents.send('timer-update', `${minutes}:${seconds}`);
+    const formattedTime = `${minutes}:${seconds}`;
 
-    // Check for inactivity
-    checkInactivity();
+    mainWindow.webContents.send('timer-update', formattedTime); // Send updated timer value
+
+    if (nextInsertTime && new Date() >= nextInsertTime) {
+      insertTrackingData();
+      nextInsertTime = calculateNextInsertTime(); // Update the next insert time
+    }
   }, 1000);
 
-  return startTime;
+  console.log('Timer started.');
 }
 
 // Function to stop the timer
@@ -289,50 +336,27 @@ ipcMain.on('logout-user', () => {
 });
 
 // Handle start and stop tracking events from the renderer process
-ipcMain.on('start-tracking', (event) => {
-  const startTime = startTimer();
+ipcMain.on('start-tracking', () => {
+  startTimer();
   startPythonTracking();
-  event.sender.startTime = startTime; // Store start time in the sender for later use
   console.log('Tracking and timer started.');
 });
 
-ipcMain.on('stop-tracking', (event) => {
+ipcMain.on('stop-tracking', () => {
   stopTimer();
   stopPythonTracking();
-
-  // Insert tracking data into the database
-  const startTime = event.sender.startTime || new Date().toISOString();
-  db.run(`
-    INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
-    VALUES (?, ?, ?, ?, ?)
-  `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
-    if (err) {
-      console.error('Error inserting tracking data:', err.message);
-    } else {
-      console.log('Tracking data saved successfully.');
-    }
-  });
-
-  // Reset counters
-  timerSeconds = 0;
-  keystrokes = 0;
-  mouseMovements = 0;
-  mouseClicks = 0;
-
-  // Notify the renderer process to toggle the "Stop" button
-  mainWindow.webContents.send('tracking-stopped');
-
+  insertTrackingData(); // Insert final data before stopping
   console.log('Tracking and timer stopped.');
 });
 
 // Handle fetch-reports event
 ipcMain.on('fetch-reports', (event) => {
-  db.all(`SELECT * FROM tracking`, [], (err, rows) => {
+  db.all(`SELECT * FROM tracking ORDER BY id DESC`, [], (err, rows) => {
     if (err) {
       console.error('Error fetching tracking data:', err.message);
       event.reply('reports-data', []);
     } else {
-      console.log('Fetched tracking data:', rows);
+      console.log('Fetched tracking data in descending order:', rows);
       event.reply('reports-data', rows);
     }
   });
