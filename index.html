@@ -8,8 +8,8 @@
 </head>
 <body>
   <h1>Welcome to the Bissoy Diagnostic Manager</h1>
-  <nav id="nav-bar">
-    <!-- Logout button and welcome message will be dynamically added here -->
+  <nav id="nav-bar" style="display: flex; justify-content: space-between; align-items: center;">
+    <!-- Welcome message and logout button will be dynamically added here -->
   </nav>
   <section id="login-section">
     <form id="login-form">
@@ -27,24 +27,34 @@
     <h2>All Users</h2>
     <ul id="user-list"></ul>
   </section>
+  <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
+    <button id="start-button">Start</button>
+    <button id="stop-button" style="display: none;">Stop</button>
+    <p id="timer-display" style="font-size: 24px; margin-top: 10px;">00:00</p>
+  </section>
   <script>
     const { ipcRenderer } = require('electron');
     let loggedInUser = null;
+    let timerInterval = null;
+    let timerSeconds = 0;
 
     function updateUI() {
       const navBar = document.getElementById('nav-bar');
       const loginSection = document.getElementById('login-section');
       const viewUsersSection = document.getElementById('view-users-section');
+      const timerSection = document.getElementById('timer-section');
 
       navBar.innerHTML = ''; // Clear navigation bar
       if (loggedInUser) {
-        // Show logout button and welcome message
+        // Show welcome message on the left
         const welcomeMessage = document.createElement('span');
         welcomeMessage.textContent = `Welcome, ${loggedInUser.username}`;
         navBar.appendChild(welcomeMessage);
 
+        // Show logout button on the right
         const logoutButton = document.createElement('button');
         logoutButton.textContent = 'Logout';
+        logoutButton.style.marginLeft = 'auto';
         logoutButton.addEventListener('click', () => {
           ipcRenderer.send('logout-user'); // Clear saved data in the database
           loggedInUser = null;
@@ -54,12 +64,44 @@
 
         loginSection.style.display = 'none';
         viewUsersSection.style.display = 'none';
+        timerSection.style.display = 'block';
       } else {
         // Show login form
         loginSection.style.display = 'block';
         viewUsersSection.style.display = 'none';
+        timerSection.style.display = 'none';
       }
     }
+
+    function startTimer() {
+      const timerDisplay = document.getElementById('timer-display');
+      const startButton = document.getElementById('start-button');
+      const stopButton = document.getElementById('stop-button');
+
+      timerSeconds = 0;
+      startButton.style.display = 'none';
+      stopButton.style.display = 'inline-block';
+
+      timerInterval = setInterval(() => {
+        timerSeconds++;
+        const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+        const seconds = String(timerSeconds % 60).padStart(2, '0');
+        timerDisplay.textContent = `${minutes}:${seconds}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      const startButton = document.getElementById('start-button');
+      const stopButton = document.getElementById('stop-button');
+
+      clearInterval(timerInterval);
+      timerInterval = null;
+      startButton.style.display = 'inline-block';
+      stopButton.style.display = 'none';
+    }
+
+    document.getElementById('start-button').addEventListener('click', startTimer);
+    document.getElementById('stop-button').addEventListener('click', stopTimer);
 
     document.getElementById('login-form').addEventListener('submit', async (event) => {
       event.preventDefault();
