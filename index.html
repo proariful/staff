@@ -153,6 +153,16 @@
       document.getElementById('mouse-movement-display').textContent = `Mouse Movements: ${count}`;
     });
 
+    ipcRenderer.on('inactivity-detected', () => {
+      stopButton.style.display = 'none'; // Hide the Stop button
+      startButton.style.display = 'inline-block'; // Show the Start button
+    });
+
+    ipcRenderer.on('tracking-stopped', () => {
+      stopButton.style.display = 'none'; // Hide the Stop button
+      startButton.style.display = 'inline-block'; // Show the Start button
+    });
+
     document.getElementById('login-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       const email = document.getElementById('username').value;

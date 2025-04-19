@@ -12,7 +12,7 @@ let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
-const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 minutes in milliseconds
+const INACTIVITY_LIMIT = 1 * 30 * 1000; // 10 minutes in milliseconds
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -131,6 +131,9 @@ function checkInactivity() {
       keystrokes = 0;
       mouseMovements = 0;
       mouseClicks = 0;
+
+      // Notify the renderer process to toggle the "Stop" button
+      mainWindow.webContents.send('inactivity-detected');
 
       // Send a notification
       new Notification({
@@ -315,6 +318,9 @@ ipcMain.on('stop-tracking', (event) => {
   keystrokes = 0;
   mouseMovements = 0;
   mouseClicks = 0;
+
+  // Notify the renderer process to toggle the "Stop" button
+  mainWindow.webContents.send('tracking-stopped');
 
   console.log('Tracking and timer stopped.');
 });
