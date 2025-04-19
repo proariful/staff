@@ -7,6 +7,10 @@ const { spawn } = require('child_process');
 let mainWindow;
 let pythonProcess;
 let timerInterval = null;
+let timerSeconds = 0;
+let keystrokes = 0;
+let mouseMovements = 0;
+let mouseClicks = 0;
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -67,6 +71,24 @@ db.serialize(() => {
   });
 });
 
+// Create the `tracking` table if it doesn't exist
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS tracking (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      starttime TEXT NOT NULL,
+      timerseconds INTEGER NOT NULL,
+      keystrokes INTEGER NOT NULL,
+      mousemovement INTEGER NOT NULL,
+      mouseclick INTEGER NOT NULL
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Error creating tracking table:', err.message);
+    }
+  });
+});
+
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -90,11 +112,14 @@ function startPythonTracking() {
     try {
       const event = JSON.parse(message);
       if (event.type === 'keystroke') {
-        mainWindow.webContents.send('keystroke-update', event.count);
+        keystrokes = event.count;
+        mainWindow.webContents.send('keystroke-update', keystrokes);
       } else if (event.type === 'mouseclick') {
-        mainWindow.webContents.send('mouseclick-update', event.count);
+        mouseClicks = event.count;
+        mainWindow.webContents.send('mouseclick-update', mouseClicks);
       } else if (event.type === 'mousemove') {
-        mainWindow.webContents.send('mousemove-update', event.count);
+        mouseMovements = event.count;
+        mainWindow.webContents.send('mousemove-update', mouseMovements);
       }
     } catch (err) {
       console.error('Failed to parse Python output:', message);
@@ -123,14 +148,18 @@ function stopPythonTracking() {
 
 // Function to start the timer
 function startTimer() {
-  let seconds = 0;
+  timerSeconds = 0;
+  const startTime = new Date().toISOString();
+  mainWindow.webContents.send('timer-update', '00:00');
+
   timerInterval = setInterval(() => {
-    seconds++;
-    const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
-    const remainingSeconds = String(seconds % 60).padStart(2, '0');
-    mainWindow.webContents.send('timer-update', `${minutes}:${remainingSeconds}`);
+    timerSeconds++;
+    const minutes = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
+    const seconds = String(timerSeconds % 60).padStart(2, '0');
+    mainWindow.webContents.send('timer-update', `${minutes}:${seconds}`);
   }, 1000);
-  console.log('Timer started.');
+
+  return startTime;
 }
 
 // Function to stop the timer
@@ -213,16 +242,50 @@ ipcMain.on('logout-user', () => {
 });
 
 // Handle start and stop tracking events from the renderer process
-ipcMain.on('start-tracking', () => {
-  startTimer();
+ipcMain.on('start-tracking', (event) => {
+  const startTime = startTimer();
   startPythonTracking();
+  event.sender.startTime = startTime; // Store start time in the sender for later use
   console.log('Tracking and timer started.');
 });
 
-ipcMain.on('stop-tracking', () => {
+ipcMain.on('stop-tracking', (event) => {
   stopTimer();
   stopPythonTracking();
+
+  // Insert tracking data into the database
+  const startTime = event.sender.startTime || new Date().toISOString();
+  db.run(`
+    INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
+    VALUES (?, ?, ?, ?, ?)
+  `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+    if (err) {
+      console.error('Error inserting tracking data:', err.message);
+    } else {
+      console.log('Tracking data saved successfully.');
+    }
+  });
+
+  // Reset counters
+  timerSeconds = 0;
+  keystrokes = 0;
+  mouseMovements = 0;
+  mouseClicks = 0;
+
   console.log('Tracking and timer stopped.');
+});
+
+// Handle fetch-reports event
+ipcMain.on('fetch-reports', (event) => {
+  db.all(`SELECT * FROM tracking`, [], (err, rows) => {
+    if (err) {
+      console.error('Error fetching tracking data:', err.message);
+      event.reply('reports-data', []);
+    } else {
+      console.log('Fetched tracking data:', rows);
+      event.reply('reports-data', rows);
+    }
+  });
 });
 
 app.on('window-all-closed', () => {

@@ -30,10 +30,29 @@
   <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
     <button id="start-button">Start</button>
     <button id="stop-button" style="display: none;">Stop</button>
+    <button id="reports-button">Reports</button>
     <p id="timer-display" style="font-size: 24px; margin-top: 10px;">00:00</p>
     <p id="keystroke-display" style="font-size: 18px; margin-top: 10px;">Keystrokes: 0</p>
     <p id="mouse-movement-display" style="font-size: 18px; margin-top: 10px;">Mouse Movements: 0</p>
     <p id="mouse-click-display" style="font-size: 18px; margin-top: 10px;">Mouse Clicks: 0</p>
+  </section>
+  <section id="reports-section" style="display: none; margin-top: 20px;">
+    <h2>Tracking Reports</h2>
+    <table id="reports-table" border="1" style="width: 100%; text-align: left;">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Start Time</th>
+          <th>Timer Seconds</th>
+          <th>Keystrokes</th>
+          <th>Mouse Movements</th>
+          <th>Mouse Clicks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Report rows will be dynamically added here -->
+      </tbody>
+    </table>
   </section>
   <script>
     const { ipcRenderer } = require('electron');
@@ -253,6 +272,32 @@
         const li = document.createElement('li');
         li.textContent = `${user.firstName} ${user.lastName}`;
         userList.appendChild(li);
+      });
+    });
+
+    const reportsButton = document.getElementById('reports-button');
+    const reportsSection = document.getElementById('reports-section');
+    const reportsTableBody = document.getElementById('reports-table').querySelector('tbody');
+
+    reportsButton.addEventListener('click', () => {
+      ipcRenderer.send('fetch-reports');
+    });
+
+    ipcRenderer.on('reports-data', (event, reports) => {
+      reportsSection.style.display = 'block'; // Show the reports section
+      reportsTableBody.innerHTML = ''; // Clear previous data
+
+      reports.forEach((report) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${report.id}</td>
+          <td>${report.starttime}</td>
+          <td>${report.timerseconds}</td>
+          <td>${report.keystrokes}</td>
+          <td>${report.mousemovement}</td>
+          <td>${report.mouseclick}</td>
+        `;
+        reportsTableBody.appendChild(row);
       });
     });
 
