@@ -12,8 +12,9 @@ let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
-const INACTIVITY_LIMIT = 1 * 30 * 1000; // 10 minutes in milliseconds
+const INACTIVITY_LIMIT = 9 * 60 * 1000; // 1 minute in milliseconds
 let nextInsertTime = null; // Track the next system time for data insertion
+let inactivityNotified = false; // Flag to track if inactivity notification has been sent
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -109,7 +110,7 @@ app.on('ready', () => {
 function calculateNextInsertTime() {
   const now = new Date();
   const nextTime = new Date(now);
-  nextTime.setMinutes(now.getMinutes() + 1, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
+  nextTime.setMinutes(now.getMinutes() + 10, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
   return nextTime;
 }
 
@@ -160,38 +161,49 @@ function checkInsertTime() {
 function checkInactivity() {
   const currentTime = Date.now();
   if (currentTime - lastActivityTime >= INACTIVITY_LIMIT) {
-    console.log('Inactivity detected. Stopping timer and saving data.');
+    if (!inactivityNotified) {
+      console.log('Inactivity detected. Stopping timer and saving data.');
 
-    // Stop the timer and tracking
-    stopTimer();
-    stopPythonTracking();
+      // Stop the timer and tracking
+      stopTimer();
+      stopPythonTracking();
 
-    // Insert tracking data into the database
-    const startTime = new Date().toISOString(); // Use current time if no start time is available
-    db.run(`
-      INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
-      VALUES (?, ?, ?, ?, ?)
-    `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
-      if (err) {
-        console.error('Error inserting tracking data on inactivity:', err.message);
-      } else {
-        console.log('Tracking data saved successfully on inactivity.');
-      }
+      // Insert tracking data into the database
+      const startTime = new Date().toISOString(); // Use current time if no start time is available
+      db.run(`
+        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
+        VALUES (?, ?, ?, ?, ?)
+      `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+        if (err) {
+          console.error('Error inserting tracking data on inactivity:', err.message);
+        } else {
+          console.log('Tracking data saved successfully on inactivity.');
+        }
 
-      // Reset counters
-      resetCounters();
+        // Reset counters
+        resetCounters();
 
-      // Notify the renderer process to toggle the "Stop" button
-      mainWindow.webContents.send('inactivity-detected');
+        // Notify the renderer process to toggle the "Stop" button
+        mainWindow.webContents.send('inactivity-detected');
 
-      // Send a notification
-      new Notification({
-        title: 'Inactivity Detected',
-        body: 'Timer stopped due to inactivity. Data has been saved.',
-      }).show();
-    });
+        // Send a notification
+        new Notification({
+          title: 'Inactivity Detected',
+          body: 'Timer stopped due to inactivity. Data has been saved.',
+        }).show();
+
+        // Set the flag to prevent duplicate notifications
+        inactivityNotified = true;
+      });
+    }
+  } else {
+    // Reset the flag if activity is detected
+    inactivityNotified = false;
   }
 }
+
+// Ensure `checkInactivity` is called regularly
+setInterval(checkInactivity, 1000); // Check for inactivity every second
 
 // Function to start the Python process
 function startPythonTracking() {
