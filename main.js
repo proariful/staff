@@ -123,7 +123,7 @@ app.on('ready', () => {
 });
 
 // Directory to save screenshots
-const screenshotsDir = path.join(userDataPath, 'screenshots');
+const screenshotsDir = path.join(__dirname, 'screenshots'); // Use the current directory for screenshots
 if (!fs.existsSync(screenshotsDir)) {
   fs.mkdirSync(screenshotsDir); // Create the screenshots directory if it doesn't exist
 }

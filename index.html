@@ -319,8 +319,8 @@
             ${
               report.screenshots
                 ? report.screenshots.split(',').map((screenshot) => `
-                    <a href="screenshots/${screenshot}" target="_blank">
-                      <img src="screenshots/${screenshot}" alt="Screenshot" width="50">
+                    <a href="./screenshots/${screenshot}" target="_blank">
+                      <img src="./screenshots/${screenshot}" alt="Screenshot" width="50">
                     </a>
                   `).join(' ')
                 : 'No Screenshots'
