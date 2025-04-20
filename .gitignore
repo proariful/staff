@@ -4,6 +4,7 @@ find . -type f -size +100M | sed 's|^\./||' >> .gitignore
 # Build output
 dist/
 dist/win-unpacked/
+screenshots/
 
 node_modules/
 
