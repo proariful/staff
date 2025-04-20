@@ -167,13 +167,13 @@ function takeScreenshot() {
 }
 
 // Start taking screenshots every minute
-setInterval(takeScreenshot, 60 * 1000); // Take a screenshot every 60 seconds
+setInterval(takeScreenshot, 3 * 60 * 1000); // Take a screenshot every 3 minutes
 
 // Function to calculate the next 1-minute interval (for local testing)
 function calculateNextInsertTime() {
   const now = new Date();
   const nextTime = new Date(now);
-  nextTime.setMinutes(now.getMinutes() + 5, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
+  nextTime.setMinutes(now.getMinutes() + 10, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
   return nextTime;
 }
 
