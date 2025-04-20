@@ -96,6 +96,19 @@ db.serialize(() => {
   });
 });
 
+// Update the `tracking` table to include a `screenshots` column
+db.serialize(() => {
+  db.run(`
+    ALTER TABLE tracking ADD COLUMN screenshots TEXT
+  `, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding screenshots column to tracking table:', err.message);
+    } else {
+      console.log('Screenshots column added to tracking table or already exists.');
+    }
+  });
+});
+
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -116,6 +129,8 @@ if (!fs.existsSync(screenshotsDir)) {
 }
 
 // Function to take a screenshot
+let screenshotNames = []; // Array to store screenshot names for the current interval
+
 function takeScreenshot() {
   if (!timerInterval) {
     console.log('Timer is not running. Skipping screenshot.');
@@ -123,34 +138,24 @@ function takeScreenshot() {
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // Format timestamp for filename
-  const screenshotPath = path.join(screenshotsDir, `screenshot-${timestamp}.png`);
-  const compressedPath = path.join(screenshotsDir, `screenshot-${timestamp}-compressed.png`);
+  const compressedPath = path.join(screenshotsDir, `screenshot-${timestamp}-compressed.jpg`);
 
-  screenshot({ filename: screenshotPath })
-    .then(() => {
-      console.log(`Screenshot saved: ${screenshotPath}`);
-      // Compress the screenshot
-      sharp(screenshotPath)
+  screenshot()
+    .then((imgBuffer) => {
+      // Compress the screenshot directly from the buffer
+      sharp(imgBuffer)
         .resize(1280, 720) // Resize to 1280x720 (optional, adjust as needed)
-        .jpeg({ quality: 40 }) // Convert to JPEG with 80% quality
+        .jpeg({ quality: 40 }) // Convert to JPEG with 40% quality
         .toFile(compressedPath)
         .then(() => {
           console.log(`Compressed screenshot saved: ${compressedPath}`);
-          // Send a notification after compressing the screenshot
-          const notification = new Notification({
+          screenshotNames.push(path.basename(compressedPath)); // Add the compressed screenshot name to the array
+
+          // Show a notification after the screenshot is taken
+          new Notification({
             title: 'Screenshot Taken',
-            body: `Compressed screenshot saved at: ${compressedPath}`,
-          });
-
-          // Open the folder when the notification is clicked
-          notification.on('click', () => {
-            shell.showItemInFolder(compressedPath);
-          });
-
-          notification.show();
-
-          // Optionally, delete the original uncompressed screenshot
-          fs.unlinkSync(screenshotPath);
+            body: `Screenshot saved as: ${path.basename(compressedPath)}`,
+          }).show();
         })
         .catch((err) => {
           console.error('Error compressing screenshot:', err.message);
@@ -168,25 +173,28 @@ setInterval(takeScreenshot, 60 * 1000); // Take a screenshot every 60 seconds
 function calculateNextInsertTime() {
   const now = new Date();
   const nextTime = new Date(now);
-  nextTime.setMinutes(now.getMinutes() + 10, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
+  nextTime.setMinutes(now.getMinutes() + 5, 0, 0); // Increment minutes by 1 and reset seconds and milliseconds
   return nextTime;
 }
 
 // Function to insert data into the database and reset counters
 function insertTrackingData() {
   const currentTime = new Date().toISOString();
+  const screenshotsString = screenshotNames.join(','); // Convert screenshot names to a comma-separated string
+
   db.run(`
-    INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
-    VALUES (?, ?, ?, ?, ?)
-  `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+    INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotsString], (err) => {
     if (err) {
       console.error('Error inserting tracking data:', err.message);
     } else {
       console.log('Tracking data saved successfully at', currentTime);
     }
 
-    // Reset counters
+    // Reset counters and screenshot names
     resetCounters();
+    screenshotNames = [];
   });
 }
 
@@ -426,12 +434,16 @@ ipcMain.on('stop-tracking', () => {
 
 // Handle fetch-reports event
 ipcMain.on('fetch-reports', (event) => {
-  db.all(`SELECT * FROM tracking ORDER BY id DESC`, [], (err, rows) => {
+  db.all(`
+    SELECT id, starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots
+    FROM tracking
+    ORDER BY id DESC
+  `, [], (err, rows) => {
     if (err) {
       console.error('Error fetching tracking data:', err.message);
       event.reply('reports-data', []);
     } else {
-      console.log('Fetched tracking data in descending order:', rows);
+      console.log('Fetched tracking data with screenshots:', rows);
       event.reply('reports-data', rows);
     }
   });

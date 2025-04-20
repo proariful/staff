@@ -55,6 +55,7 @@
           <th>Keystrokes</th>
           <th>Mouse Movements</th>
           <th>Mouse Clicks</th>
+          <th>Screenshots</th> <!-- Added column for screenshots -->
         </tr>
       </thead>
       <tbody>
@@ -314,6 +315,17 @@
           <td>${report.keystrokes}</td>
           <td>${report.mousemovement}</td>
           <td>${report.mouseclick}</td>
+          <td>
+            ${
+              report.screenshots
+                ? report.screenshots.split(',').map((screenshot) => `
+                    <a href="screenshots/${screenshot}" target="_blank">
+                      <img src="screenshots/${screenshot}" alt="Screenshot" width="50">
+                    </a>
+                  `).join(' ')
+                : 'No Screenshots'
+            }
+          </td>
         `;
         reportsTableBody.appendChild(row);
       });
