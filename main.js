@@ -237,17 +237,18 @@ function checkInactivity() {
       // Insert tracking data into the database
       const startTime = new Date().toISOString(); // Use current time if no start time is available
       db.run(`
-        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
-        VALUES (?, ?, ?, ?, ?)
-      `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
+        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotNames.join(',')], (err) => {
         if (err) {
           console.error('Error inserting tracking data on inactivity:', err.message);
         } else {
           console.log('Tracking data saved successfully on inactivity.');
         }
 
-        // Reset counters
+        // Reset counters and screenshot names
         resetCounters();
+        screenshotNames = [];
 
         // Notify the renderer process to toggle the "Stop" button
         mainWindow.webContents.send('inactivity-detected');
