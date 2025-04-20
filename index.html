@@ -141,7 +141,8 @@
     });
 
     stopButton.addEventListener('click', () => {
-      ipcRenderer.send('stop-tracking');
+      ipcRenderer.send('stop-tracking'); // Notify the main process to stop tracking
+      stopTimer(); // Call stopTimer function
       stopButton.style.display = 'none'; // Hide the Stop button
       startButton.style.display = 'inline-block'; // Show the Start button
     });

@@ -342,10 +342,16 @@ function startTimer() {
 // Function to stop the timer
 function stopTimer() {
   if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
+    clearInterval(timerInterval); // Clear the interval
+    timerInterval = null; // Reset the interval variable
     console.log('Timer stopped.');
   }
+
+  // Reset the next insert time to prevent further data insertion
+  nextInsertTime = null;
+
+  // Notify the renderer process to update the UI
+  mainWindow.webContents.send('tracking-stopped');
 }
 
 // Handle save-user event
