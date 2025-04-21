@@ -500,6 +500,82 @@ function stopTimer() {
 
   // Notify the renderer process to update the UI
   mainWindow.webContents.send('tracking-stopped');
+
+  // Automatically send tracking data after stopping the timer
+  sendTrackingData();
+}
+
+// Function to send tracking data
+function sendTrackingData() {
+  db.get(`SELECT token FROM login_data WHERE id = 1`, [], async (err, row) => {
+    if (err || !row) {
+      console.error('Error retrieving token:', err ? err.message : 'No token found.');
+      return;
+    }
+
+    const userToken = row.token;
+
+    // Fetch only records with status 0 (not uploaded)
+    db.all(`SELECT * FROM tracking WHERE status = 0`, [], async (err, rows) => {
+      if (err) {
+        console.error('Error fetching tracking data:', err.message);
+        return;
+      }
+
+      if (rows.length === 0) {
+        console.log('No unuploaded tracking data to upload.');
+        return;
+      }
+
+      // Format the starttime values to MySQL DATETIME format
+      const formattedRows = rows.map((row) => ({
+        ...row,
+        starttime: formatToMySQLDateTime(row.starttime),
+      }));
+
+      try {
+        const response = await axios.post('https://www.bissoy.com/api/tracking', { data: formattedRows }, {
+          headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        if (response.status === 200 && response.data.status === 'success') {
+          console.log('Tracking data sent successfully:', response.data);
+
+          // Update the status to 1 for successfully sent records
+          const ids = rows.map((row) => row.id).join(',');
+          db.run(`UPDATE tracking SET status = 1 WHERE id IN (${ids})`, (err) => {
+            if (err) {
+              console.error('Error updating tracking status to uploaded:', err.message);
+            } else {
+              console.log('Tracking status updated to uploaded for records:', ids);
+            }
+          });
+        } else {
+          console.error('Failed to send tracking data:', response.data);
+        }
+      } catch (error) {
+        console.error('Error sending tracking data:', error.response?.data || error.message);
+      }
+    });
+  });
+}
+
+// Set an interval to send tracking data every 30 minutes
+setInterval(() => {
+  console.log('Sending tracking data at 30-minute interval...');
+  sendTrackingData();
+}, 30 * 60 * 1000); // 30 minutes in milliseconds
+
+// Function to format ISO date to MySQL DATETIME format
+function formatToMySQLDateTime(isoDate) {
+  const date = new Date(isoDate);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 // Handle save-user event
