@@ -62,7 +62,9 @@
           <th>Keystrokes</th>
           <th>Mouse Movements</th>
           <th>Mouse Clicks</th>
-          <th>Screenshots</th> <!-- Added column for screenshots -->
+          <th>Project ID</th> <!-- Added column for project ID -->
+          <th>Project Name</th> <!-- Added column for project name -->
+          <th>Screenshots</th>
         </tr>
       </thead>
       <tbody>
@@ -401,6 +403,8 @@
           <td>${report.keystrokes}</td>
           <td>${report.mousemovement}</td>
           <td>${report.mouseclick}</td>
+          <td>${report.project_id || 'N/A'}</td> <!-- Display project ID -->
+          <td>${report.project_name || 'No Project Selected'}</td> <!-- Display project name -->
           <td>
             ${
               report.screenshots
