@@ -155,6 +155,19 @@ db.serialize(() => {
   });
 });
 
+// Update the `tracking` table to include `user_id` column
+db.serialize(() => {
+  db.run(`
+    ALTER TABLE tracking ADD COLUMN user_id INTEGER
+  `, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding user_id column to tracking table:', err.message);
+    } else {
+      console.log('user_id column added to tracking table or already exists.');
+    }
+  });
+});
+
 // Create the `projects` table if it doesn't exist
 db.serialize(() => {
   db.run(`
@@ -287,24 +300,28 @@ function insertTrackingData() {
   const currentTime = new Date().toISOString();
   const screenshotsString = screenshotNames.join(','); // Convert screenshot names to a comma-separated string
 
-  // Fetch the currently selected project ID and name
-  db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, row) => {
-    const selectedProjectId = row ? row.project_id : null;
-    const selectedProjectName = row ? row.name : null;
+  // Fetch the currently logged-in user and selected project
+  db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
+    const loggedInUserId = userRow ? userRow.user_id : null;
 
-    db.run(`
-      INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotsString, selectedProjectId, selectedProjectName], (err) => {
-      if (err) {
-        console.error('Error inserting tracking data:', err.message);
-      } else {
-        console.log('Tracking data saved successfully at', currentTime);
-      }
+    db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
+      const selectedProjectId = projectRow ? projectRow.project_id : null;
+      const selectedProjectName = projectRow ? projectRow.name : null;
 
-      // Reset counters and screenshot names
-      resetCounters();
-      screenshotNames = [];
+      db.run(`
+        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotsString, selectedProjectId, selectedProjectName, loggedInUserId], (err) => {
+        if (err) {
+          console.error('Error inserting tracking data:', err.message);
+        } else {
+          console.log('Tracking data saved successfully at', currentTime);
+        }
+
+        // Reset counters and screenshot names
+        resetCounters();
+        screenshotNames = [];
+      });
     });
   });
 }
@@ -634,7 +651,7 @@ ipcMain.on('stop-tracking', () => {
 // Handle fetch-reports event
 ipcMain.on('fetch-reports', (event) => {
   db.all(`
-    SELECT id, starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name
+    SELECT id, starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id
     FROM tracking
     ORDER BY id DESC
   `, [], (err, rows) => {
@@ -642,7 +659,7 @@ ipcMain.on('fetch-reports', (event) => {
       console.error('Error fetching tracking data:', err.message);
       event.reply('reports-data', []);
     } else {
-      console.log('Fetched tracking data with project IDs and names:', rows);
+      console.log('Fetched tracking data with user IDs:', rows);
       event.reply('reports-data', rows);
     }
   });

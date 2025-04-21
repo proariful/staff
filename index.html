@@ -27,9 +27,9 @@
     <h2>All Users</h2>
     <ul id="user-list"></ul>
   </section>
-  <section id="project-section" style="display: none; margin-top: 20px;">
+  <section id="project-section" style="display: none; margin-top: 20px; text-align: center;">
     <h2>Assigned Projects</h2>
-    <select id="project-dropdown">
+    <select id="project-dropdown" style="margin: 0 auto; display: block;">
       <option value="" disabled selected>Select a project</option>
     </select>
     <p id="selected-project-message" style="margin-top: 10px; color: green;"></p>
@@ -62,8 +62,9 @@
           <th>Keystrokes</th>
           <th>Mouse Movements</th>
           <th>Mouse Clicks</th>
-          <th>Project ID</th> <!-- Added column for project ID -->
-          <th>Project Name</th> <!-- Added column for project name -->
+          <th>Project ID</th>
+          <th>Project Name</th>
+          <th>User ID</th> <!-- Added column for user ID -->
           <th>Screenshots</th>
         </tr>
       </thead>
@@ -403,8 +404,9 @@
           <td>${report.keystrokes}</td>
           <td>${report.mousemovement}</td>
           <td>${report.mouseclick}</td>
-          <td>${report.project_id || 'N/A'}</td> <!-- Display project ID -->
-          <td>${report.project_name || 'No Project Selected'}</td> <!-- Display project name -->
+          <td>${report.project_id || 'N/A'}</td>
+          <td>${report.project_name || 'No Project Selected'}</td>
+          <td>${report.user_id || 'N/A'}</td> <!-- Display user ID -->
           <td>
             ${
               report.screenshots
