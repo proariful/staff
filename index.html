@@ -77,11 +77,6 @@
     let timerSeconds = 0;
 
     async function fetchProjects() {
-      if (!loggedInUser || !loggedInUser.token) {
-        console.error('User token is missing.');
-        return;
-      }
-
       try {
         const response = await axios.get('https://www.bissoy.com/api/projects', {
           headers: { Authorization: `Bearer ${loggedInUser.token}` },
@@ -113,6 +108,24 @@
         console.error('Error fetching projects:', error);
       }
     }
+
+    // Handle offline projects when the app is reopened
+    ipcRenderer.on('projects-data', (event, projects) => {
+      const projectDropdown = document.getElementById('project-dropdown');
+      projectDropdown.innerHTML = '<option value="" disabled selected>Select a project</option>'; // Reset dropdown
+
+      projects.forEach((project) => {
+        const option = document.createElement('option');
+        option.value = project.project_id;
+        option.textContent = project.name; // Only display the project name
+        projectDropdown.appendChild(option);
+      });
+
+      document.getElementById('project-section').style.display = 'block'; // Show the project section
+
+      // Fetch and display the previously selected project
+      ipcRenderer.send('get-selected-project');
+    });
 
     // Automatically save the selected project when the dropdown value changes
     document.getElementById('project-dropdown').addEventListener('change', (event) => {
@@ -162,7 +175,8 @@
         viewUsersSection.style.display = 'none';
         timerSection.style.display = 'block';
 
-        fetchProjects(); // Fetch projects for the logged-in user
+        // Fetch offline projects when the app is reopened
+        ipcRenderer.send('fetch-projects');
       } else {
         // Show login form
         loginSection.style.display = 'block';
@@ -271,6 +285,9 @@
 
           // Save user data and token to the local database
           ipcRenderer.send('save-login-data', loggedInUser);
+
+          // Fetch projects after login
+          await fetchProjects();
 
           // Display user data
           const userDataSection = document.createElement('section');

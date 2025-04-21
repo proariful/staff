@@ -165,6 +165,32 @@ db.serialize(() => {
   });
 });
 
+// Ensure the `project_id` column is unique in the `projects` table
+db.serialize(() => {
+  db.run(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_project_id ON projects (project_id)
+  `, (err) => {
+    if (err) {
+      console.error('Error creating unique index on project_id:', err.message);
+    } else {
+      console.log('Unique index on project_id created or already exists.');
+    }
+  });
+});
+
+// Remove the unique constraint on the `id` column (if previously added)
+db.serialize(() => {
+  db.run(`
+    DROP INDEX IF EXISTS idx_projects_id
+  `, (err) => {
+    if (err) {
+      console.error('Error dropping unique index on id in projects table:', err.message);
+    } else {
+      console.log('Unique index on id in projects table removed (if it existed).');
+    }
+  });
+});
+
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
     width: 800,
@@ -484,7 +510,7 @@ ipcMain.on('logout-user', () => {
 // Handle storing projects fetched from the API
 ipcMain.on('store-projects', (event, projects) => {
   const insertStmt = db.prepare(`
-    INSERT OR REPLACE INTO projects (project_id, name, employee_id, assigned_at)
+    INSERT OR IGNORE INTO projects (project_id, name, employee_id, assigned_at)
     VALUES (?, ?, ?, ?)
   `);
 
@@ -504,6 +530,19 @@ ipcMain.on('store-projects', (event, projects) => {
 
   insertStmt.finalize(() => {
     console.log('Projects saved successfully.');
+  });
+});
+
+// Handle fetching projects (online or offline)
+ipcMain.on('fetch-projects', (event) => {
+  db.all(`SELECT project_id, name FROM projects`, [], (err, rows) => {
+    if (err) {
+      console.error('Error fetching projects from database:', err.message);
+      event.reply('projects-data', []);
+    } else {
+      console.log('Fetched projects from database:', rows);
+      event.reply('projects-data', rows);
+    }
   });
 });
 
