@@ -29,7 +29,10 @@
   </section>
   <section id="project-section" style="display: none; margin-top: 20px;">
     <h2>Assigned Projects</h2>
-    <ul id="project-list"></ul>
+    <select id="project-dropdown">
+      <option value="" disabled selected>Select a project</option>
+    </select>
+    <p id="selected-project-message" style="margin-top: 10px; color: green;"></p>
   </section>
   <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
     <button id="start-button">Start</button>
@@ -86,19 +89,23 @@
 
         if (response.data.status === 'success') {
           const projects = response.data.data;
-          const projectList = document.getElementById('project-list');
-          projectList.innerHTML = ''; // Clear previous data
+          const projectDropdown = document.getElementById('project-dropdown');
+          projectDropdown.innerHTML = '<option value="" disabled selected>Select a project</option>'; // Reset dropdown
 
           projects.forEach((project) => {
-            const li = document.createElement('li');
-            li.textContent = `${project.name} (Assigned At: ${project.assigned_at})`;
-            projectList.appendChild(li);
+            const option = document.createElement('option');
+            option.value = project.project_id;
+            option.textContent = project.name; // Only display the project name
+            projectDropdown.appendChild(option);
           });
 
           document.getElementById('project-section').style.display = 'block'; // Show the project section
 
           // Send project data to the main process for storage
           ipcRenderer.send('store-projects', projects);
+
+          // Fetch and display the previously selected project
+          ipcRenderer.send('get-selected-project');
         } else {
           console.error('Failed to fetch projects:', response.data);
         }
@@ -106,6 +113,26 @@
         console.error('Error fetching projects:', error);
       }
     }
+
+    // Automatically save the selected project when the dropdown value changes
+    document.getElementById('project-dropdown').addEventListener('change', (event) => {
+      const selectedProjectId = event.target.value;
+      const selectedProjectName = event.target.options[event.target.selectedIndex]?.text;
+
+      if (selectedProjectId) {
+        ipcRenderer.send('save-selected-project', { projectId: selectedProjectId, projectName: selectedProjectName });
+        document.getElementById('selected-project-message').textContent = `Selected Project: ${selectedProjectName}`;
+      }
+    });
+
+    // Display the previously selected project on app launch
+    ipcRenderer.on('selected-project-response', (event, selectedProject) => {
+      if (selectedProject) {
+        const projectDropdown = document.getElementById('project-dropdown');
+        projectDropdown.value = selectedProject.projectId; // Set the dropdown value to the saved project ID
+       
+      }
+    });
 
     function updateUI() {
       const navBar = document.getElementById('nav-bar');

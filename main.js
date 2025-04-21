@@ -58,6 +58,15 @@ db.serialize(() => {
   });
 });
 
+// Add a column for selected_project_id if it doesn't exist
+db.run(`
+  ALTER TABLE users ADD COLUMN selected_project_id INTEGER
+`, (err) => {
+  if (err && !err.message.includes('duplicate column')) {
+    console.error('Error adding selected_project_id column:', err.message);
+  }
+});
+
 // Create the `login_data` table if it doesn't exist
 db.serialize(() => {
   db.run(`
@@ -119,6 +128,39 @@ db.serialize(() => {
       console.error('Error adding screenshots column to tracking table:', err.message);
     } else {
       console.log('Screenshots column added to tracking table or already exists.');
+    }
+  });
+});
+
+// Create the `projects` table if it doesn't exist
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      employee_id INTEGER NOT NULL,
+      assigned_at TEXT NOT NULL,
+      selected_project_id INTEGER DEFAULT NULL
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Error creating projects table:', err.message);
+    } else {
+      console.log('Projects table created or already exists.');
+    }
+  });
+});
+
+// Ensure the `selected_project_id` column exists in the `projects` table
+db.serialize(() => {
+  db.run(`
+    ALTER TABLE projects ADD COLUMN selected_project_id INTEGER DEFAULT NULL
+  `, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding selected_project_id column to projects table:', err.message);
+    } else {
+      console.log('selected_project_id column added to projects table or already exists.');
     }
   });
 });
@@ -439,6 +481,74 @@ ipcMain.on('logout-user', () => {
   });
 });
 
+// Handle storing projects fetched from the API
+ipcMain.on('store-projects', (event, projects) => {
+  const insertStmt = db.prepare(`
+    INSERT OR REPLACE INTO projects (project_id, name, employee_id, assigned_at)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  projects.forEach((project) => {
+    insertStmt.run(
+      project.project_id,
+      project.name,
+      project.employee_id,
+      project.assigned_at,
+      (err) => {
+        if (err) {
+          console.error('Error inserting project:', err.message);
+        }
+      }
+    );
+  });
+
+  insertStmt.finalize(() => {
+    console.log('Projects saved successfully.');
+  });
+});
+
+// Handle saving the selected project
+ipcMain.on('save-selected-project', (event, { projectId }) => {
+  // Clear the previous selection
+  db.run(
+    `UPDATE projects SET selected_project_id = NULL WHERE selected_project_id = 1`,
+    (err) => {
+      if (err) {
+        console.error('Error clearing previous selected project:', err.message);
+      } else {
+        // Mark the new project as selected
+        db.run(
+          `UPDATE projects SET selected_project_id = 1 WHERE project_id = ?`,
+          [projectId],
+          (err) => {
+            if (err) {
+              console.error('Error saving selected project:', err.message);
+            } else {
+              console.log('Selected project updated successfully.');
+            }
+          }
+        );
+      }
+    }
+  );
+});
+
+// Handle retrieving the selected project
+ipcMain.on('get-selected-project', (event) => {
+  db.get(
+    `SELECT project_id, name FROM projects WHERE selected_project_id = 1`,
+    [],
+    (err, row) => {
+      if (err) {
+        console.error('Error retrieving selected project:', err.message);
+        event.reply('selected-project-response', null);
+      } else {
+        event.reply('selected-project-response', row ? { projectId: row.project_id, projectName: row.name } : null);
+      }
+    }
+  );
+});
+
 // Handle start and stop tracking events from the renderer process
 ipcMain.on('start-tracking', () => {
   startTimer();
@@ -553,6 +663,7 @@ app.on('window-all-closed', () => {
       }
 
       // Reset counters
+
       resetCounters();
 
       // Quit the app
