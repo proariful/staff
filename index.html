@@ -27,6 +27,10 @@
     <h2>All Users</h2>
     <ul id="user-list"></ul>
   </section>
+  <section id="project-section" style="display: none; margin-top: 20px;">
+    <h2>Assigned Projects</h2>
+    <ul id="project-list"></ul>
+  </section>
   <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
     <button id="start-button">Start</button>
     <button id="stop-button" style="display: none;">Stop</button>
@@ -69,6 +73,40 @@
     let timerInterval = null;
     let timerSeconds = 0;
 
+    async function fetchProjects() {
+      if (!loggedInUser || !loggedInUser.token) {
+        console.error('User token is missing.');
+        return;
+      }
+
+      try {
+        const response = await axios.get('https://www.bissoy.com/api/projects', {
+          headers: { Authorization: `Bearer ${loggedInUser.token}` },
+        });
+
+        if (response.data.status === 'success') {
+          const projects = response.data.data;
+          const projectList = document.getElementById('project-list');
+          projectList.innerHTML = ''; // Clear previous data
+
+          projects.forEach((project) => {
+            const li = document.createElement('li');
+            li.textContent = `${project.name} (Assigned At: ${project.assigned_at})`;
+            projectList.appendChild(li);
+          });
+
+          document.getElementById('project-section').style.display = 'block'; // Show the project section
+
+          // Send project data to the main process for storage
+          ipcRenderer.send('store-projects', projects);
+        } else {
+          console.error('Failed to fetch projects:', response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+      }
+    }
+
     function updateUI() {
       const navBar = document.getElementById('nav-bar');
       const loginSection = document.getElementById('login-section');
@@ -96,6 +134,8 @@
         loginSection.style.display = 'none';
         viewUsersSection.style.display = 'none';
         timerSection.style.display = 'block';
+
+        fetchProjects(); // Fetch projects for the logged-in user
       } else {
         // Show login form
         loginSection.style.display = 'block';
