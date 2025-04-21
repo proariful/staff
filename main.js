@@ -172,7 +172,7 @@ db.serialize(() => {
 // Update the `tracking` table to include a `status` column
 db.serialize(() => {
   db.run(`
-    ALTER TABLE tracking ADD COLUMN status TEXT DEFAULT 'pending'
+    ALTER TABLE tracking ADD COLUMN status INTEGER DEFAULT 0
   `, (err) => {
     if (err && !err.message.includes('duplicate column name')) {
       console.error('Error adding status column to tracking table:', err.message);
@@ -768,8 +768,8 @@ ipcMain.on('send-tracking-data', (event) => {
 
     const userToken = row.token;
 
-    // Fetch only records with status 'pending'
-    db.all(`SELECT * FROM tracking WHERE status = 'pending'`, [], async (err, rows) => {
+    // Fetch only records with status 0 (not uploaded)
+    db.all(`SELECT * FROM tracking WHERE status = 0`, [], async (err, rows) => {
       if (err) {
         console.error('Error fetching tracking data:', err.message);
         event.reply('send-tracking-data-response', { success: false, message: 'Failed to fetch tracking data.' });
@@ -777,8 +777,8 @@ ipcMain.on('send-tracking-data', (event) => {
       }
 
       if (rows.length === 0) {
-        console.log('No pending tracking data to upload.');
-        event.reply('send-tracking-data-response', { success: true, message: 'No pending data to upload.' });
+        console.log('No unuploaded tracking data to upload.');
+        event.reply('send-tracking-data-response', { success: true, message: 'No unuploaded data to upload.' });
         return;
       }
 
@@ -796,9 +796,9 @@ ipcMain.on('send-tracking-data', (event) => {
         if (response.status === 200 && response.data.status === 'success') {
           console.log('Tracking data sent successfully:', response.data);
 
-          // Update the status to 'uploaded' for successfully sent records
+          // Update the status to 1 for successfully sent records
           const ids = rows.map((row) => row.id).join(',');
-          db.run(`UPDATE tracking SET status = 'uploaded' WHERE id IN (${ids})`, (err) => {
+          db.run(`UPDATE tracking SET status = 1 WHERE id IN (${ids})`, (err) => {
             if (err) {
               console.error('Error updating tracking status to uploaded:', err.message);
             } else {
@@ -813,17 +813,6 @@ ipcMain.on('send-tracking-data', (event) => {
         }
       } catch (error) {
         console.error('Error sending tracking data:', error.response?.data || error.message);
-
-        // Update the status to 'failed' for records that failed to upload
-        const ids = rows.map((row) => row.id).join(',');
-        db.run(`UPDATE tracking SET status = 'failed' WHERE id IN (${ids})`, (err) => {
-          if (err) {
-            console.error('Error updating tracking status to failed:', err.message);
-          } else {
-            console.log('Tracking status updated to failed for records:', ids);
-          }
-        });
-
         event.reply('send-tracking-data-response', { success: false, message: 'Error sending tracking data.' });
       }
     });
