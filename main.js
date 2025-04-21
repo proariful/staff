@@ -69,11 +69,25 @@ db.serialize(() => {
       email TEXT,
       points INTEGER,
       balance INTEGER,
-      profile_picture TEXT
+      profile_picture TEXT,
+      token TEXT
     )
   `, (err) => {
     if (err) {
       console.error('Error creating login_data table:', err.message);
+    }
+  });
+});
+
+// Update the `login_data` table to include a `token` column
+db.serialize(() => {
+  db.run(`
+    ALTER TABLE login_data ADD COLUMN token TEXT
+  `, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding token column to login_data table:', err.message);
+    } else {
+      console.log('Token column added to login_data table or already exists.');
     }
   });
 });
@@ -390,9 +404,9 @@ ipcMain.on('get-users', (event) => {
 // Save login data
 ipcMain.on('save-login-data', (event, userData) => {
   db.run(`
-    INSERT OR REPLACE INTO login_data (id, user_id, username, full_name, email, points, balance, profile_picture)
-    VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-  `, [userData.id, userData.username, userData.full_name, userData.email, userData.points, userData.balance, userData.profile_picture], (err) => {
+    INSERT OR REPLACE INTO login_data (id, user_id, username, full_name, email, points, balance, profile_picture, token)
+    VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [userData.id, userData.username, userData.full_name, userData.email, userData.points, userData.balance, userData.profile_picture, userData.token], (err) => {
     if (err) {
       console.error('Error saving login data:', err.message);
     } else {

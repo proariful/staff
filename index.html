@@ -199,9 +199,10 @@
             points: result.user.points,
             balance: result.user.balance,
             profile_picture: result.user.dp_300,
+            token: result.token, // Store the user token
           };
 
-          // Save user data to the local database
+          // Save user data and token to the local database
           ipcRenderer.send('save-login-data', loggedInUser);
 
           // Display user data
