@@ -6,6 +6,7 @@ const { spawn } = require('child_process');
 const screenshot = require('screenshot-desktop'); // Import the screenshot-desktop package
 const os = require('os'); // Import the os module to determine the user's home directory
 const sharp = require('sharp'); // Import the sharp library for image compression
+const axios = require('axios'); // Import axios for HTTP requests
 
 let mainWindow;
 let pythonProcess;
@@ -302,7 +303,12 @@ function insertTrackingData() {
 
   // Fetch the currently logged-in user and selected project
   db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
-    const loggedInUserId = userRow ? userRow.user_id : null;
+    if (err || !userRow) {
+      console.error('Error retrieving user_id:', err ? err.message : 'No user logged in.');
+      return; // Exit if no user is logged in
+    }
+
+    const loggedInUserId = userRow.user_id;
 
     db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
       const selectedProjectId = projectRow ? projectRow.project_id : null;
@@ -722,6 +728,66 @@ function getActiveTimes(callback) {
 ipcMain.on('fetch-active-times', (event) => {
   getActiveTimes((results) => {
     event.reply('active-times-response', results);
+  });
+});
+
+// Function to format ISO date to MySQL DATETIME format
+function formatToMySQLDateTime(isoDate) {
+  const date = new Date(isoDate);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+// Handle sending tracking data to the server
+ipcMain.on('send-tracking-data', (event) => {
+  // Retrieve the token from the login_data table
+  db.get(`SELECT token FROM login_data WHERE id = 1`, [], async (err, row) => {
+    if (err || !row) {
+      console.error('Error retrieving token:', err ? err.message : 'No token found.');
+      event.reply('send-tracking-data-response', { success: false, message: 'User is not logged in.' });
+      return;
+    }
+
+    const userToken = row.token;
+
+    db.all(`SELECT * FROM tracking`, [], async (err, rows) => {
+      if (err) {
+        console.error('Error fetching tracking data:', err.message);
+        event.reply('send-tracking-data-response', { success: false, message: 'Failed to fetch tracking data.' });
+        return;
+      }
+
+      // Format the starttime values to MySQL DATETIME format
+      const formattedRows = rows.map((row) => ({
+        ...row,
+        starttime: formatToMySQLDateTime(row.starttime),
+      }));
+
+      // Log the formatted data being sent to the server for debugging
+      console.log('Formatted tracking data being sent to the server:', formattedRows);
+
+      try {
+        const response = await axios.post('https://www.bissoy.com/api/tracking', { data: formattedRows }, {
+          headers: { Authorization: `Bearer ${userToken}` },
+        });
+
+        if (response.status === 200 && response.data.status === 'success') {
+          console.log('Tracking data sent successfully:', response.data);
+          event.reply('send-tracking-data-response', { success: true, message: 'Tracking data sent successfully.' });
+        } else {
+          console.error('Failed to send tracking data:', response.data);
+          event.reply('send-tracking-data-response', { success: false, message: 'Failed to send tracking data.' });
+        }
+      } catch (error) {
+        console.error('Error sending tracking data:', error.response?.data || error.message);
+        event.reply('send-tracking-data-response', { success: false, message: 'Error sending tracking data.' });
+      }
+    });
   });
 });
 

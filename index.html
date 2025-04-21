@@ -53,6 +53,8 @@
   </section>
   <section id="reports-section" style="display: none; margin-top: 20px;">
     <h2>Tracking Reports</h2>
+    <button id="send-tracking-data-button" style="margin-bottom: 10px;">Send Tracking Data to Server</button>
+    <p id="send-tracking-data-message" style="color: green;"></p>
     <table id="reports-table" border="1" style="width: 100%; text-align: left;">
       <thead>
         <tr>
@@ -421,6 +423,18 @@
         `;
         reportsTableBody.appendChild(row);
       });
+    });
+
+    const sendTrackingDataButton = document.getElementById('send-tracking-data-button');
+    const sendTrackingDataMessage = document.getElementById('send-tracking-data-message');
+
+    sendTrackingDataButton.addEventListener('click', () => {
+      ipcRenderer.send('send-tracking-data');
+    });
+
+    ipcRenderer.on('send-tracking-data-response', (event, { success, message }) => {
+      sendTrackingDataMessage.textContent = message;
+      sendTrackingDataMessage.style.color = success ? 'green' : 'red';
     });
 
     // Fetch and display total active times
