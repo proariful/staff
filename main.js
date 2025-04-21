@@ -169,6 +169,19 @@ db.serialize(() => {
   });
 });
 
+// Update the `tracking` table to include a `status` column
+db.serialize(() => {
+  db.run(`
+    ALTER TABLE tracking ADD COLUMN status TEXT DEFAULT 'pending'
+  `, (err) => {
+    if (err && !err.message.includes('duplicate column name')) {
+      console.error('Error adding status column to tracking table:', err.message);
+    } else {
+      console.log('Status column added to tracking table or already exists.');
+    }
+  });
+});
+
 // Create the `projects` table if it doesn't exist
 db.serialize(() => {
   db.run(`
@@ -755,10 +768,17 @@ ipcMain.on('send-tracking-data', (event) => {
 
     const userToken = row.token;
 
-    db.all(`SELECT * FROM tracking`, [], async (err, rows) => {
+    // Fetch only records with status 'pending'
+    db.all(`SELECT * FROM tracking WHERE status = 'pending'`, [], async (err, rows) => {
       if (err) {
         console.error('Error fetching tracking data:', err.message);
         event.reply('send-tracking-data-response', { success: false, message: 'Failed to fetch tracking data.' });
+        return;
+      }
+
+      if (rows.length === 0) {
+        console.log('No pending tracking data to upload.');
+        event.reply('send-tracking-data-response', { success: true, message: 'No pending data to upload.' });
         return;
       }
 
@@ -768,9 +788,6 @@ ipcMain.on('send-tracking-data', (event) => {
         starttime: formatToMySQLDateTime(row.starttime),
       }));
 
-      // Log the formatted data being sent to the server for debugging
-      console.log('Formatted tracking data being sent to the server:', formattedRows);
-
       try {
         const response = await axios.post('https://www.bissoy.com/api/tracking', { data: formattedRows }, {
           headers: { Authorization: `Bearer ${userToken}` },
@@ -778,6 +795,17 @@ ipcMain.on('send-tracking-data', (event) => {
 
         if (response.status === 200 && response.data.status === 'success') {
           console.log('Tracking data sent successfully:', response.data);
+
+          // Update the status to 'uploaded' for successfully sent records
+          const ids = rows.map((row) => row.id).join(',');
+          db.run(`UPDATE tracking SET status = 'uploaded' WHERE id IN (${ids})`, (err) => {
+            if (err) {
+              console.error('Error updating tracking status to uploaded:', err.message);
+            } else {
+              console.log('Tracking status updated to uploaded for records:', ids);
+            }
+          });
+
           event.reply('send-tracking-data-response', { success: true, message: 'Tracking data sent successfully.' });
         } else {
           console.error('Failed to send tracking data:', response.data);
@@ -785,6 +813,17 @@ ipcMain.on('send-tracking-data', (event) => {
         }
       } catch (error) {
         console.error('Error sending tracking data:', error.response?.data || error.message);
+
+        // Update the status to 'failed' for records that failed to upload
+        const ids = rows.map((row) => row.id).join(',');
+        db.run(`UPDATE tracking SET status = 'failed' WHERE id IN (${ids})`, (err) => {
+          if (err) {
+            console.error('Error updating tracking status to failed:', err.message);
+          } else {
+            console.log('Tracking status updated to failed for records:', ids);
+          }
+        });
+
         event.reply('send-tracking-data-response', { success: false, message: 'Error sending tracking data.' });
       }
     });
