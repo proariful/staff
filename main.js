@@ -281,12 +281,26 @@ function takeScreenshot() {
         .toFile(compressedPath)
         .then(() => {
           console.log(`Compressed screenshot saved: ${compressedPath}`);
-          screenshotNames.push(path.basename(compressedPath)); // Add the compressed screenshot name to the array
+          const screenshotName = path.basename(compressedPath); // Get the screenshot name
+          screenshotNames.push(screenshotName); // Add the compressed screenshot name to the array
+
+          // Save the screenshot name in the screenshots table
+          db.run(
+            `INSERT INTO screenshots (name, status) VALUES (?, 0)`,
+            [screenshotName],
+            (err) => {
+              if (err) {
+                console.error('Error saving screenshot name to database:', err.message);
+              } else {
+                console.log(`Screenshot name saved to database: ${screenshotName}`);
+              }
+            }
+          );
 
           // Show a notification after the screenshot is taken
           new Notification({
             title: 'Screenshot Taken',
-            body: `Screenshot saved as: ${path.basename(compressedPath)}`,
+            body: `Screenshot saved as: ${screenshotName}`,
           }).show();
         })
         .catch((err) => {
