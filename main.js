@@ -270,54 +270,63 @@ function takeScreenshot() {
     return; // Do not take a screenshot if the timer is not running
   }
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // Format timestamp for filename
-  const compressedPath = path.join(screenshotsDir, `screenshot-${timestamp}-compressed.jpg`);
+  // Fetch the currently logged-in user ID
+  db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, row) => {
+    if (err || !row) {
+      console.error('Error retrieving user_id:', err ? err.message : 'No user logged in.');
+      return;
+    }
 
-  screenshot()
-    .then((imgBuffer) => {
-      // Compress the screenshot directly from the buffer
-      sharp(imgBuffer)
-        .resize(1280, 720) // Resize to 1280x720 (optional, adjust as needed)
-        .jpeg({ quality: 40 }) // Convert to JPEG with 40% quality
-        .toFile(compressedPath)
-        .then(() => {
-          console.log(`Compressed screenshot saved: ${compressedPath}`);
-          const screenshotName = path.basename(compressedPath); // Get the screenshot name
-          screenshotNames.push(screenshotName); // Add the compressed screenshot name to the array
+    const userId = row.user_id;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-'); // Format timestamp for filename
+    const screenshotName = `${userId}_${timestamp}.jpg`; // Include user_id and timestamp in the name
+    const compressedPath = path.join(screenshotsDir, screenshotName);
 
-          // Save the screenshot name in the screenshots table
-          db.run(
-            `INSERT INTO screenshots (name, status) VALUES (?, 0)`,
-            [screenshotName],
-            (err) => {
-              if (err) {
-                console.error('Error saving screenshot name to database:', err.message);
-              } else {
-                console.log(`Screenshot name saved to database: ${screenshotName}`);
+    screenshot()
+      .then((imgBuffer) => {
+        // Compress the screenshot directly from the buffer
+        sharp(imgBuffer)
+          .resize(1280, 720) // Resize to 1280x720 (optional, adjust as needed)
+          .jpeg({ quality: 40 }) // Convert to JPEG with 40% quality
+          .toFile(compressedPath)
+          .then(() => {
+            console.log(`Compressed screenshot saved: ${compressedPath}`);
+            screenshotNames.push(screenshotName); // Add the compressed screenshot name to the array
+
+            // Save the screenshot name in the screenshots table
+            db.run(
+              `INSERT INTO screenshots (name, status) VALUES (?, 0)`,
+              [screenshotName],
+              (err) => {
+                if (err) {
+                  console.error('Error saving screenshot name to database:', err.message);
+                } else {
+                  console.log(`Screenshot name saved to database: ${screenshotName}`);
+                }
               }
-            }
-          );
+            );
 
-          // Show a notification after the screenshot is taken
-          const notification = new Notification({
-            title: 'Screenshot Taken',
-            body: `Screenshot saved as: ${screenshotName}`,
+            // Show a notification after the screenshot is taken
+            const notification = new Notification({
+              title: 'Screenshot Taken',
+              body: `Screenshot saved as: ${screenshotName}`,
+            });
+
+            // Open the screenshot file or folder when the notification is clicked
+            notification.on('click', () => {
+              shell.showItemInFolder(compressedPath); // Open the folder and highlight the file
+            });
+
+            notification.show();
+          })
+          .catch((err) => {
+            console.error('Error compressing screenshot:', err.message);
           });
-
-          // Open the screenshot file or folder when the notification is clicked
-          notification.on('click', () => {
-            shell.showItemInFolder(compressedPath); // Open the folder and highlight the file
-          });
-
-          notification.show();
-        })
-        .catch((err) => {
-          console.error('Error compressing screenshot:', err.message);
-        });
-    })
-    .catch((err) => {
-      console.error('Error taking screenshot:', err.message);
-    });
+      })
+      .catch((err) => {
+        console.error('Error taking screenshot:', err.message);
+      });
+  });
 }
 
 // Start taking screenshots every minute
