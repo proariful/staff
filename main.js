@@ -7,6 +7,7 @@ const screenshot = require('screenshot-desktop'); // Import the screenshot-deskt
 const os = require('os'); // Import the os module to determine the user's home directory
 const sharp = require('sharp'); // Import the sharp library for image compression
 const axios = require('axios'); // Import axios for HTTP requests
+const FormData = require('form-data'); // Import FormData for file uploads
 
 let mainWindow;
 let pythonProcess;
@@ -906,6 +907,79 @@ ipcMain.on('send-tracking-data', (event) => {
         event.reply('send-tracking-data-response', { success: false, message: 'Error sending tracking data.' });
       }
     });
+  });
+});
+
+// Handle uploading screenshots
+ipcMain.on('upload-screenshots', async (event) => {
+  db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
+    if (err) {
+      console.error('Error fetching screenshots:', err.message);
+      event.reply('upload-screenshots-response', 'Error fetching screenshots.');
+      return;
+    }
+
+    if (rows.length === 0) {
+      console.log('No screenshots with status 0 to upload.');
+      return;
+    }
+
+    const userToken = await new Promise((resolve) => {
+      db.get(`SELECT token FROM login_data WHERE id = 1`, [], (err, row) => {
+        if (err || !row) {
+          console.error('Error retrieving token:', err ? err.message : 'No token found.');
+          resolve(null);
+        } else {
+          resolve(row.token);
+        }
+      });
+    });
+
+    if (!userToken) {
+      event.reply('upload-screenshots-response', 'User is not logged in.');
+      return;
+    }
+
+    for (const screenshot of rows) {
+      const filePath = path.join(screenshotsDir, screenshot.name);
+      if (!fs.existsSync(filePath)) {
+        console.warn(`Screenshot file not found: ${filePath}`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+      formData.append('originalFileName', screenshot.name);
+
+      try {
+        const response = await axios.post('https://www.bissoy.com/api/upload-screenshot', formData, {
+          headers: {
+            ...formData.getHeaders(),
+            Authorization: `Bearer ${userToken}`,
+          },
+        });
+
+        if (response.status === 200 && response.data.success) {
+          console.log(`Screenshot uploaded successfully: ${screenshot.name}`);
+
+          // Update the status to 1 after successful upload
+          db.run(`UPDATE screenshots SET status = 1 WHERE id = ?`, [screenshot.id], (err) => {
+            if (err) {
+              console.error(`Error updating status for screenshot: ${screenshot.name}`, err.message);
+            } else {
+              console.log(`Status updated to 1 for screenshot: ${screenshot.name}`);
+            }
+          });
+        } else {
+          console.error(`Failed to upload screenshot: ${screenshot.name}`, response.data);
+        }
+      } catch (error) {
+        console.error(`Error uploading screenshot: ${screenshot.name}`);
+        console.error('Error details:', error.response?.data || error.message);
+      }
+    }
+
+    
   });
 });
 

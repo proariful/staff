@@ -75,6 +75,7 @@
       </tbody>
     </table>
   </section>
+  <button id="upload-images-btn">Upload Screenshots</button>
   <script>
     const { ipcRenderer } = require('electron');
     let loggedInUser = null;
@@ -453,6 +454,15 @@
     // Fetch active times on app load and after tracking stops
     fetchActiveTimes();
     ipcRenderer.on('tracking-stopped', fetchActiveTimes);
+
+    // Handle image upload button click
+    document.getElementById('upload-images-btn').addEventListener('click', () => {
+      ipcRenderer.send('upload-screenshots');
+    });
+
+    ipcRenderer.on('upload-screenshots-response', (event, message) => {
+      alert(message); // Display a message after the upload process
+    });
 
     // Initialize UI
     updateUI();
