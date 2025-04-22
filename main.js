@@ -529,8 +529,11 @@ function stopTimer() {
   // Reset the next insert time to prevent further data insertion
   nextInsertTime = null;
 
-  // Notify the renderer process to update the UI
-  mainWindow.webContents.send('tracking-stopped');
+  // Check if mainWindow is still valid before interacting with it
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    // Notify the renderer process to update the UI
+    mainWindow.webContents.send('tracking-stopped');
+  }
 
   // Automatically send tracking data after stopping the timer
   sendTrackingData();
@@ -1083,26 +1086,42 @@ app.on('window-all-closed', () => {
     // Stop the Python tracking process
     stopPythonTracking();
 
-    // Insert tracking data into the database
-    const startTime = new Date().toISOString(); // Use current time if no start time is available
-    db.run(`
-      INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick)
-      VALUES (?, ?, ?, ?, ?)
-    `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks], (err) => {
-      if (err) {
-        console.error('Error inserting tracking data on app close:', err.message);
-      } else {
-        console.log('Tracking data saved successfully on app close.');
+    // Fetch the currently logged-in user and selected project
+    db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
+      if (err || !userRow) {
+        console.error('Error retrieving user_id:', err ? err.message : 'No user logged in.');
+        return app.quit();
       }
 
-      // Reset counters
+      const loggedInUserId = userRow.user_id;
 
-      resetCounters();
+      db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
+        const selectedProjectId = projectRow ? projectRow.project_id : null;
+        const selectedProjectName = projectRow ? projectRow.name : null;
 
-      // Quit the app
-      if (process.platform !== 'darwin') {
-        app.quit();
-      }
+        // Insert tracking data into the database
+        const startTime = new Date().toISOString(); // Use current time if no start time is available
+        db.run(
+          `INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotNames.join(','), selectedProjectId, selectedProjectName, loggedInUserId],
+          (err) => {
+            if (err) {
+              console.error('Error inserting tracking data on app close:', err.message);
+            } else {
+              console.log('Tracking data saved successfully on app close.');
+            }
+
+            // Reset counters
+            resetCounters();
+
+            // Quit the app
+            if (process.platform !== 'darwin') {
+              app.quit();
+            }
+          }
+        );
+      });
     });
   } else {
     // Quit the app directly if no timer or tracking is active
