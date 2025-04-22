@@ -581,6 +581,82 @@ setInterval(() => {
   sendTrackingData();
 }, 30 * 60 * 1000); // 30 minutes in milliseconds
 
+// Function to upload screenshots every 30 minutes
+function uploadScreenshotsPeriodically() {
+  db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
+    if (err) {
+      console.error('Error fetching screenshots:', err.message);
+      return;
+    }
+
+    if (rows.length === 0) {
+      console.log('No screenshots with status 0 to upload.');
+      return;
+    }
+
+    const userToken = await new Promise((resolve) => {
+      db.get(`SELECT token FROM login_data WHERE id = 1`, [], (err, row) => {
+        if (err || !row) {
+          console.error('Error retrieving token:', err ? err.message : 'No token found.');
+          resolve(null);
+        } else {
+          resolve(row.token);
+        }
+      });
+    });
+
+    if (!userToken) {
+      console.error('User is not logged in. Cannot upload screenshots.');
+      return;
+    }
+
+    for (const screenshot of rows) {
+      const filePath = path.join(screenshotsDir, screenshot.name);
+      if (!fs.existsSync(filePath)) {
+        console.warn(`Screenshot file not found: ${filePath}`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+      formData.append('originalFileName', screenshot.name);
+
+      try {
+        const response = await axios.post('https://www.bissoy.com/api/upload-screenshot', formData, {
+          headers: {
+            ...formData.getHeaders(),
+            Authorization: `Bearer ${userToken}`,
+          },
+        });
+
+        if (response.status === 200 && response.data.success) {
+          console.log(`Screenshot uploaded successfully: ${screenshot.name}`);
+
+          // Update the status to 1 after successful upload
+          db.run(`UPDATE screenshots SET status = 1 WHERE id = ?`, [screenshot.id], (err) => {
+            if (err) {
+              console.error(`Error updating status for screenshot: ${screenshot.name}`, err.message);
+            } else {
+              console.log(`Status updated to 1 for screenshot: ${screenshot.name}`);
+            }
+          });
+        } else {
+          console.error(`Failed to upload screenshot: ${screenshot.name}`, response.data);
+        }
+      } catch (error) {
+        console.error(`Error uploading screenshot: ${screenshot.name}`);
+        console.error('Error details:', error.response?.data || error.message);
+      }
+    }
+  });
+}
+
+// Set an interval to upload screenshots every 30 minutes
+setInterval(() => {
+  console.log('Uploading screenshots at 30-minute interval...');
+  uploadScreenshotsPeriodically();
+}, 30 * 60 * 1000); // 30 minutes in milliseconds
+
 // Function to format ISO date to MySQL DATETIME format
 function formatToMySQLDateTime(isoDate) {
   const date = new Date(isoDate);
@@ -978,8 +1054,6 @@ ipcMain.on('upload-screenshots', async (event) => {
         console.error('Error details:', error.response?.data || error.message);
       }
     }
-
-    
   });
 });
 
