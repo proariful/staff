@@ -342,6 +342,12 @@ function calculateNextInsertTime() {
 
 // Function to insert data into the database and reset counters
 function insertTrackingData() {
+  if (timerSeconds < 5) {
+    console.log('Timer seconds less than 5. Skipping data insertion.');
+    resetCounters();
+    return; // Exit if timerSeconds is less than 5
+  }
+
   const currentTime = new Date().toISOString();
   const screenshotsString = screenshotNames.join(','); // Convert screenshot names to a comma-separated string
 
@@ -358,20 +364,22 @@ function insertTrackingData() {
       const selectedProjectId = projectRow ? projectRow.project_id : null;
       const selectedProjectName = projectRow ? projectRow.name : null;
 
-      db.run(`
-        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotsString, selectedProjectId, selectedProjectName, loggedInUserId], (err) => {
-        if (err) {
-          console.error('Error inserting tracking data:', err.message);
-        } else {
-          console.log('Tracking data saved successfully at', currentTime);
-        }
+      db.run(
+        `INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [currentTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotsString, selectedProjectId, selectedProjectName, loggedInUserId],
+        (err) => {
+          if (err) {
+            console.error('Error inserting tracking data:', err.message);
+          } else {
+            console.log('Tracking data saved successfully at', currentTime);
+          }
 
-        // Reset counters and screenshot names
-        resetCounters();
-        screenshotNames = [];
-      });
+          // Reset counters and screenshot names
+          resetCounters();
+          screenshotNames = [];
+        }
+      );
     });
   });
 }
@@ -1098,6 +1106,16 @@ app.on('window-all-closed', () => {
       db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
         const selectedProjectId = projectRow ? projectRow.project_id : null;
         const selectedProjectName = projectRow ? projectRow.name : null;
+
+        // Skip inserting data if timerSeconds is less than 5 seconds
+        if (timerSeconds < 5) {
+          console.log('Timer seconds less than 5. Skipping data insertion.');
+          resetCounters();
+          if (process.platform !== 'darwin') {
+            app.quit();
+          }
+          return; // Explicitly return to prevent further execution
+        }
 
         // Insert tracking data into the database
         const startTime = new Date().toISOString(); // Use current time if no start time is available
