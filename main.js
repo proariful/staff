@@ -883,6 +883,7 @@ ipcMain.on('stop-tracking', () => {
 
 // Handle fetch-reports event
 ipcMain.on('fetch-reports', (event) => {
+  const currentScreenshotsDir = path.join(app.getPath('userData'), 'screenshots'); // Dynamically get the current screenshots directory
   db.all(`
     SELECT id, starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id
     FROM tracking
@@ -892,8 +893,16 @@ ipcMain.on('fetch-reports', (event) => {
       console.error('Error fetching tracking data:', err.message);
       event.reply('reports-data', []);
     } else {
-      console.log('Fetched tracking data with user IDs:', rows);
-      event.reply('reports-data', rows);
+      // Add the full path of screenshots to the report data
+      const reportsWithPaths = rows.map((row) => {
+        const screenshotPaths = row.screenshots
+          ? row.screenshots.split(',').map((name) => path.join(currentScreenshotsDir, name))
+          : [];
+        return { ...row, screenshotPaths };
+      });
+
+      console.log('Fetched tracking data with updated screenshot paths:', reportsWithPaths);
+      event.reply('reports-data', reportsWithPaths);
     }
   });
 });
