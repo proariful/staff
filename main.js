@@ -40,20 +40,22 @@ app.on('ready', () => {
 
   // Replace Python tracking with node-global-key-listener
   gkl.addListener((event) => {
+    if (!timerInterval) return; // Only count events when the timer is running
+
     console.log(`Event received: ${JSON.stringify(event)}`); // Log all events for debugging
     lastActivityTime = Date.now(); // Update the last activity time on any event
 
     if (event.state === 'DOWN') {
-      if (event.name.startsWith('Key') || event.rawKey?.standardName?.startsWith('KEY')) {
+      if (event.name.startsWith('Key') || event.rawKey?.standardName) {
         keystrokes++;
-        console.log(`Key pressed: ${event.name || event.rawKey.standardName}, Total keystrokes: ${keystrokes}`); // Log key press
+        console.log(`Key pressed, Total keystrokes: ${keystrokes}`); // Log key press
         mainWindow.webContents.send('keystroke-update', keystrokes); // Send keystroke count to renderer
-      } else if (event.name === 'MOUSE LEFT' || event.name === 'MOUSE RIGHT') {
+      } else if (event.rawKey?.name === 'LBUTTON' || event.rawKey?.name === 'RBUTTON') {
         mouseClicks++;
-        console.log(`Mouse clicked: ${event.name}, Total mouse clicks: ${mouseClicks}`); // Log mouse click
+        console.log(`Mouse clicked: ${event.rawKey.name}, Total mouse clicks: ${mouseClicks}`); // Log mouse click
         mainWindow.webContents.send('mouseclick-update', mouseClicks); // Send mouse click count to renderer
       }
-    } else if (event.name === 'MOUSE MOVE') {
+    } else if (event.rawKey?.name === 'MOUSE MOVE') {
       mouseMovements++;
       console.log(`Mouse moved, Total mouse movements: ${mouseMovements}`); // Log mouse movement
       mainWindow.webContents.send('mousemove-update', mouseMovements); // Send mouse movement count to renderer
