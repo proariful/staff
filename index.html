@@ -37,11 +37,11 @@
   <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
     <button id="start-button">Start</button>
     <button id="stop-button" style="display: none;">Stop</button>
-    <button id="reports-button">Reports</button>
+    <button id="reports-button" style="display: none;">Reports</button>
     <p id="timer-display" style="font-size: 24px; margin-top: 10px;">00:00</p>
     <p id="keystroke-display" style="font-size: 18px; margin-top: 10px;">Keystrokes: 0</p>
-    <p id="mouse-movement-display" style="font-size: 18px; margin-top: 10px;">Mouse Movements: 0</p>
-    <p id="mouse-click-display" style="font-size: 18px; margin-top: 10px;">Mouse Clicks: 0</p>
+    <p id="mouse-movement-display" style="font-size: 18px; margin-top: 10px;display: none;">Mouse Movements: 0</p>
+    <p id="mouse-click-display" style="font-size: 18px; margin-top: 10px;display: none;">Mouse Clicks: 0</p>
     <div id="active-times-display" style="font-size: 18px; margin-top: 20px;">
       <h3>Total Active Times</h3>
       <p id="today-active-time">Today: 0h 0m</p>
@@ -51,11 +51,12 @@
       <p id="lastmonth-active-time">Last Month: 0h 0m</p>
     </div>
   </section>
+  <button id="send-tracking-data-button" style="margin-bottom: 10px;">Send Tracking Data to Server</button>
+  <button id="upload-images-btn">Upload Screenshots</button>
   <section id="reports-section" style="display: none; margin-top: 20px;">
     <h2>Tracking Reports</h2>
-    <button id="send-tracking-data-button" style="margin-bottom: 10px;">Send Tracking Data to Server</button>
     <p id="send-tracking-data-message" style="color: green;"></p>
-    <table id="reports-table" border="1" style="width: 100%; text-align: left;">
+    <table id="reports-table" border="1" style="width: 100%; text-align: left; display: none;">
       <thead>
         <tr>
           <th>ID</th>
@@ -75,7 +76,7 @@
       </tbody>
     </table>
   </section>
-  <button id="upload-images-btn">Upload Screenshots</button>
+  
   <script>
     const { ipcRenderer } = require('electron');
     let loggedInUser = null;
