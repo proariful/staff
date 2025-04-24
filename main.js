@@ -305,9 +305,14 @@ db.serialize(() => {
 });
 
 // Directory to save screenshots
-const screenshotsDir = path.join(__dirname, 'screenshots'); // Use the current directory for screenshots
+const screenshotsDir = path.join(app.getPath('userData'), 'screenshots'); // Use the userData directory for screenshots
 if (!fs.existsSync(screenshotsDir)) {
-  fs.mkdirSync(screenshotsDir); // Create the screenshots directory if it doesn't exist
+  try {
+    fs.mkdirSync(screenshotsDir, { recursive: true }); // Create the screenshots directory if it doesn't exist
+    console.log(`Screenshots directory created at: ${screenshotsDir}`);
+  } catch (err) {
+    console.error(`Failed to create screenshots directory: ${err.message}`);
+  }
 }
 
 // Function to take a screenshot
