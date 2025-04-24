@@ -376,6 +376,19 @@ function takeScreenshot() {
                 }
               }
             );
+
+            // Show a notification after the screenshot is taken
+            const notification = new Notification({
+              title: 'Screenshot Taken',
+              body: `Screenshot saved as: ${screenshotName}`,
+            });
+
+            // Open the screenshot file or folder when the notification is clicked
+            notification.on('click', () => {
+              shell.showItemInFolder(compressedPath); // Open the folder and highlight the file
+            });
+
+            notification.show();
           })
           .catch((err) => {
             console.error('Error compressing screenshot:', err.message);
