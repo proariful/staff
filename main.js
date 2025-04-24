@@ -470,7 +470,6 @@ ipcMain.on('upload-screenshots', async (event) => {
       }
     }
 
-    event.reply('upload-screenshots-response', { success: true, message: 'Screenshots uploaded successfully.' }); // Send success response
   });
 });
 
