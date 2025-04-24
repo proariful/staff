@@ -304,6 +304,23 @@ db.serialize(() => {
   });
 });
 
+// Create the `screenshots` table if it doesn't exist
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS screenshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      status INTEGER DEFAULT 0
+    )
+  `, (err) => {
+    if (err) {
+      console.error('Error creating screenshots table:', err.message);
+    } else {
+      console.log('Screenshots table created or already exists.');
+    }
+  });
+});
+
 // Directory to save screenshots
 const screenshotsDir = path.join(app.getPath('userData'), 'screenshots'); // Use the userData directory for screenshots
 if (!fs.existsSync(screenshotsDir)) {
@@ -359,19 +376,6 @@ function takeScreenshot() {
                 }
               }
             );
-
-            // Show a notification after the screenshot is taken
-            const notification = new Notification({
-              title: 'Screenshot Taken',
-              body: `Screenshot saved as: ${screenshotName}`,
-            });
-
-            // Open the screenshot file or folder when the notification is clicked
-            notification.on('click', () => {
-              shell.showItemInFolder(compressedPath); // Open the folder and highlight the file
-            });
-
-            notification.show();
           })
           .catch((err) => {
             console.error('Error compressing screenshot:', err.message);
@@ -383,8 +387,88 @@ function takeScreenshot() {
   });
 }
 
+// Function to upload screenshots to the server
+ipcMain.on('upload-screenshots', async (event) => {
+  db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
+    if (err) {
+      console.error('Error fetching screenshots:', err.message);
+      event.reply('upload-screenshots-response', { success: false, message: 'Error fetching screenshots.' }); // Send error response
+      return;
+    }
+
+    if (rows.length === 0) {
+      console.log('No screenshots with status 0 to upload.');
+      event.reply('upload-screenshots-response', { success: true, message: 'No screenshots to upload.' }); // Send success response with no screenshots
+      return;
+    }
+
+    const userToken = await new Promise((resolve) => {
+      db.get(`SELECT token FROM login_data WHERE id = 1`, [], (err, row) => {
+        if (err || !row) {
+          console.error('Error retrieving token:', err ? err.message : 'No token found.');
+          resolve(null);
+        } else {
+          resolve(row.token);
+        }
+      });
+    });
+
+    if (!userToken) {
+      event.reply('upload-screenshots-response', { success: false, message: 'User is not logged in.' }); // Send error response for missing token
+      return;
+    }
+
+    for (const screenshot of rows) {
+      const filePath = path.join(screenshotsDir, screenshot.name);
+      if (!fs.existsSync(filePath)) {
+        console.warn(`Screenshot file not found: ${filePath}`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(filePath));
+      formData.append('originalFileName', screenshot.name);
+
+      try {
+        const response = await axios.post('https://www.bissoy.com/api/upload-screenshot', formData, {
+          headers: {
+            ...formData.getHeaders(),
+            Authorization: `Bearer ${userToken}`,
+          },
+        });
+
+        if (response.status === 200 && response.data.success) {
+          console.log(`Screenshot uploaded successfully: ${screenshot.name}`);
+
+          // Update the status to 1 after successful upload
+          db.run(`UPDATE screenshots SET status = 1 WHERE id = ?`, [screenshot.id], (err) => {
+            if (err) {
+              console.error(`Error updating status for screenshot: ${screenshot.name}`, err.message);
+            } else {
+              console.log(`Status updated to 1 for screenshot: ${screenshot.name}`);
+            }
+          });
+        } else {
+          console.error(`Failed to upload screenshot: ${screenshot.name}`, response.data);
+        }
+      } catch (error) {
+        console.error(`Error uploading screenshot: ${screenshot.name}`);
+        console.error('Error details:', error.response?.data || error.message);
+      }
+    }
+
+    event.reply('upload-screenshots-response', { success: true, message: 'Screenshots uploaded successfully.' }); // Send success response
+  });
+});
+
+// Set an interval to upload screenshots every 30 minutes
+setInterval(() => {
+  console.log('Uploading screenshots at 30-minute interval...');
+  uploadScreenshots();
+}, 30 * 60 * 1000); // 30 minutes in milliseconds
+
 // Start taking screenshots every minute
-setInterval(takeScreenshot, 3 * 60 * 1000); // Take a screenshot every 3 minutes
+setInterval(takeScreenshot, 1 * 60 * 1000); // Take a screenshot every 3 minutes
 
 // Function to calculate the next 1-minute interval (for local testing)
 function calculateNextInsertTime() {
@@ -608,82 +692,6 @@ function sendTrackingData() {
 setInterval(() => {
   console.log('Sending tracking data at 30-minute interval...');
   sendTrackingData();
-}, 30 * 60 * 1000); // 30 minutes in milliseconds
-
-// Function to upload screenshots every 30 minutes
-function uploadScreenshotsPeriodically() {
-  db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
-    if (err) {
-      console.error('Error fetching screenshots:', err.message);
-      return;
-    }
-
-    if (rows.length === 0) {
-      console.log('No screenshots with status 0 to upload.');
-      return;
-    }
-
-    const userToken = await new Promise((resolve) => {
-      db.get(`SELECT token FROM login_data WHERE id = 1`, [], (err, row) => {
-        if (err || !row) {
-          console.error('Error retrieving token:', err ? err.message : 'No token found.');
-          resolve(null);
-        } else {
-          resolve(row.token);
-        }
-      });
-    });
-
-    if (!userToken) {
-      console.error('User is not logged in. Cannot upload screenshots.');
-      return;
-    }
-
-    for (const screenshot of rows) {
-      const filePath = path.join(screenshotsDir, screenshot.name);
-      if (!fs.existsSync(filePath)) {
-        console.warn(`Screenshot file not found: ${filePath}`);
-        continue;
-      }
-
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(filePath));
-      formData.append('originalFileName', screenshot.name);
-
-      try {
-        const response = await axios.post('https://www.bissoy.com/api/upload-screenshot', formData, {
-          headers: {
-            ...formData.getHeaders(),
-            Authorization: `Bearer ${userToken}`,
-          },
-        });
-
-        if (response.status === 200 && response.data.success) {
-          console.log(`Screenshot uploaded successfully: ${screenshot.name}`);
-
-          // Update the status to 1 after successful upload
-          db.run(`UPDATE screenshots SET status = 1 WHERE id = ?`, [screenshot.id], (err) => {
-            if (err) {
-              console.error(`Error updating status for screenshot: ${screenshot.name}`, err.message);
-            } else {
-              console.log(`Status updated to 1 for screenshot: ${screenshot.name}`);
-            }
-          });
-        } else {
-          console.error(`Failed to upload screenshot: ${screenshot.name}`, response.data);
-        }
-      } catch (error) {
-        console.error(`Error uploading screenshot: ${screenshot.name}`);
-        console.error('Error details:', error.response?.data || error.message);
-      }
-    }
-  });
-}
-
-// Set an interval to upload screenshots every 30 minutes
-setInterval(() => {
-  console.log('Uploading screenshots at 30-minute interval...');
-  uploadScreenshotsPeriodically();
 }, 30 * 60 * 1000); // 30 minutes in milliseconds
 
 // Function to format ISO date to MySQL DATETIME format
@@ -938,18 +946,6 @@ ipcMain.on('fetch-active-times', (event) => {
   });
 });
 
-// Function to format ISO date to MySQL DATETIME format
-function formatToMySQLDateTime(isoDate) {
-  const date = new Date(isoDate);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
 // Handle sending tracking data to the server
 ipcMain.on('send-tracking-data', (event) => {
   // Retrieve the token from the login_data table
@@ -1010,77 +1006,6 @@ ipcMain.on('send-tracking-data', (event) => {
         event.reply('send-tracking-data-response', { success: false, message: 'Error sending tracking data.' });
       }
     });
-  });
-});
-
-// Handle uploading screenshots
-ipcMain.on('upload-screenshots', async (event) => {
-  db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
-    if (err) {
-      console.error('Error fetching screenshots:', err.message);
-      event.reply('upload-screenshots-response', 'Error fetching screenshots.');
-      return;
-    }
-
-    if (rows.length === 0) {
-      console.log('No screenshots with status 0 to upload.');
-      return;
-    }
-
-    const userToken = await new Promise((resolve) => {
-      db.get(`SELECT token FROM login_data WHERE id = 1`, [], (err, row) => {
-        if (err || !row) {
-          console.error('Error retrieving token:', err ? err.message : 'No token found.');
-          resolve(null);
-        } else {
-          resolve(row.token);
-        }
-      });
-    });
-
-    if (!userToken) {
-      event.reply('upload-screenshots-response', 'User is not logged in.');
-      return;
-    }
-
-    for (const screenshot of rows) {
-      const filePath = path.join(screenshotsDir, screenshot.name);
-      if (!fs.existsSync(filePath)) {
-        console.warn(`Screenshot file not found: ${filePath}`);
-        continue;
-      }
-
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(filePath));
-      formData.append('originalFileName', screenshot.name);
-
-      try {
-        const response = await axios.post('https://www.bissoy.com/api/upload-screenshot', formData, {
-          headers: {
-            ...formData.getHeaders(),
-            Authorization: `Bearer ${userToken}`,
-          },
-        });
-
-        if (response.status === 200 && response.data.success) {
-          console.log(`Screenshot uploaded successfully: ${screenshot.name}`);
-
-          // Update the status to 1 after successful upload
-          db.run(`UPDATE screenshots SET status = 1 WHERE id = ?`, [screenshot.id], (err) => {
-            if (err) {
-              console.error(`Error updating status for screenshot: ${screenshot.name}`, err.message);
-            } else {
-              console.log(`Status updated to 1 for screenshot: ${screenshot.name}`);
-            }
-          });
-        } else {
-          console.error(`Failed to upload screenshot: ${screenshot.name}`, response.data);
-        }
-      } catch (error) {
-        console.error(`Error uploading screenshot: ${screenshot.name}`);
-        console.error('Error details:', error.response?.data || error.message);
-      }
-    }
   });
 });
 
