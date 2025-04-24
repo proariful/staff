@@ -58,7 +58,7 @@ app.on('ready', () => {
 
   // Function to handle mouse movements
   function handleMouseMovement(event) {
-    if (event.rawKey?.name === 'MOUSE MOVE') {
+    if (event.name === 'MOUSE MOVE') {
       mouseMovements++;
       console.log(`Mouse moved, Total mouse movements: ${mouseMovements}`); // Log mouse movement
       mainWindow.webContents.send('mousemove-update', mouseMovements); // Send mouse movement count to renderer
@@ -75,7 +75,7 @@ app.on('ready', () => {
     if (event.state === 'DOWN') {
       handleKeyboardClick(event); // Handle keyboard clicks
       handleMouseClick(event); // Handle mouse clicks
-    } else {
+    } else if (event.name === 'MOUSE MOVE') {
       handleMouseMovement(event); // Handle mouse movements
     }
   });
