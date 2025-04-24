@@ -1,0 +1,3 @@
+-- database: c:\Users\Ariful\AppData\Roaming\bissoy-staff-manager\user_data.db
+
+SELECT * FROM tracking

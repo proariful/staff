@@ -2,15 +2,14 @@ const { app, BrowserWindow, ipcMain, Notification, shell } = require('electron')
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 const screenshot = require('screenshot-desktop'); // Import the screenshot-desktop package
 const os = require('os'); // Import the os module to determine the user's home directory
 const sharp = require('sharp'); // Import the sharp library for image compression
 const axios = require('axios'); // Import axios for HTTP requests
 const FormData = require('form-data'); // Import FormData for file uploads
+const { GlobalKeyboardListener } = require('node-global-key-listener'); // Import node-global-key-listener
 
 let mainWindow;
-let pythonProcess;
 let timerInterval = null;
 let timerSeconds = 0;
 let keystrokes = 0;
@@ -20,6 +19,27 @@ let lastActivityTime = Date.now(); // Track the last activity time
 const INACTIVITY_LIMIT = 9 * 60 * 1000; // 1 minute in milliseconds
 let nextInsertTime = null; // Track the next system time for data insertion
 let inactivityNotified = false; // Flag to track if inactivity notification has been sent
+
+// Initialize the global keyboard listener
+const gkl = new GlobalKeyboardListener();
+
+// Replace Python tracking with node-global-key-listener
+gkl.addListener((event) => {
+  lastActivityTime = Date.now(); // Update the last activity time on any event
+
+  if (event.state === 'DOWN') {
+    if (event.name.startsWith('Key')) {
+      keystrokes++;
+      mainWindow.webContents.send('keystroke-update', keystrokes); // Send keystroke count to renderer
+    } else if (event.name === 'MouseLeft') {
+      mouseClicks++;
+      mainWindow.webContents.send('mouseclick-update', mouseClicks); // Send mouse click count to renderer
+    }
+  } else if (event.name === 'MouseMove') {
+    mouseMovements++;
+    mainWindow.webContents.send('mousemove-update', mouseMovements); // Send mouse movement count to renderer
+  }
+}); // Added missing closing parenthesis
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -391,11 +411,6 @@ function resetCounters() {
   mouseMovements = 0;
   mouseClicks = 0;
 
-  // Notify the Python process about the reset
-  if (pythonProcess && pythonProcess.stdin.writable) {
-    pythonProcess.stdin.write(JSON.stringify({ type: 'reset' }) + '\n');
-  }
-
   // Log the reset values to confirm
   console.log('Counters reset:', { timerSeconds, keystrokes, mouseMovements, mouseClicks });
 }
@@ -418,7 +433,6 @@ function checkInactivity() {
 
       // Stop the timer and tracking
       stopTimer();
-      stopPythonTracking();
 
       // Insert tracking data into the database
       const startTime = new Date().toISOString(); // Use current time if no start time is available
@@ -458,51 +472,6 @@ function checkInactivity() {
 // Ensure `checkInactivity` is called regularly
 setInterval(checkInactivity, 1000); // Check for inactivity every second
 
-// Function to start the Python process
-function startPythonTracking() {
-  const pythonScriptPath = path.join(__dirname, 'input_tracker.py');
-  pythonProcess = spawn('python', [pythonScriptPath]);
-
-  pythonProcess.stdout.on('data', (data) => {
-    const message = data.toString().trim();
-    try {
-      const event = JSON.parse(message);
-      lastActivityTime = Date.now(); // Update the last activity time on any event
-      if (event.type === 'keystroke') {
-        keystrokes = event.count;
-        mainWindow.webContents.send('keystroke-update', keystrokes);
-      } else if (event.type === 'mouseclick') {
-        mouseClicks = event.count;
-        mainWindow.webContents.send('mouseclick-update', mouseClicks);
-      } else if (event.type === 'mousemove') {
-        mouseMovements = event.count;
-        mainWindow.webContents.send('mousemove-update', mouseMovements);
-      }
-    } catch (err) {
-      console.error('Failed to parse Python output:', message);
-    }
-  });
-
-  pythonProcess.stderr.on('data', (data) => {
-    console.error(`Python error: ${data}`);
-  });
-
-  pythonProcess.on('close', (code) => {
-    console.log(`Python script exited with code ${code}`);
-  });
-
-  console.log('Python tracking started.');
-}
-
-// Function to stop the Python process
-function stopPythonTracking() {
-  if (pythonProcess) {
-    pythonProcess.kill();
-    pythonProcess = null;
-    console.log('Python tracking stopped.');
-  }
-}
-
 // Function to start the timer
 function startTimer() {
   resetCounters();
@@ -537,9 +506,8 @@ function stopTimer() {
   // Reset the next insert time to prevent further data insertion
   nextInsertTime = null;
 
-  // Check if mainWindow is still valid before interacting with it
+  // Notify the renderer process to update the UI
   if (mainWindow && !mainWindow.isDestroyed()) {
-    // Notify the renderer process to update the UI
     mainWindow.webContents.send('tracking-stopped');
   }
 
@@ -850,13 +818,11 @@ ipcMain.on('get-selected-project', (event) => {
 // Handle start and stop tracking events from the renderer process
 ipcMain.on('start-tracking', () => {
   startTimer();
-  startPythonTracking();
   console.log('Tracking and timer started.');
 });
 
 ipcMain.on('stop-tracking', () => {
   stopTimer();
-  stopPythonTracking();
   insertTrackingData(); // Insert final data before stopping
   console.log('Tracking and timer stopped.');
 });
@@ -1085,14 +1051,11 @@ ipcMain.on('upload-screenshots', async (event) => {
 });
 
 app.on('window-all-closed', () => {
-  if (timerInterval || pythonProcess) {
+  if (timerInterval) {
     console.log('App is closing. Stopping timer and saving tracking data.');
 
     // Stop the timer
     stopTimer();
-
-    // Stop the Python tracking process
-    stopPythonTracking();
 
     // Fetch the currently logged-in user and selected project
     db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
@@ -1142,7 +1105,7 @@ app.on('window-all-closed', () => {
       });
     });
   } else {
-    // Quit the app directly if no timer or tracking is active
+    // Quit the app directly if no timer is active
     if (process.platform !== 'darwin') {
       app.quit();
     }
