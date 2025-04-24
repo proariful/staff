@@ -23,23 +23,45 @@ let inactivityNotified = false; // Flag to track if inactivity notification has 
 // Initialize the global keyboard listener
 const gkl = new GlobalKeyboardListener();
 
-// Replace Python tracking with node-global-key-listener
-gkl.addListener((event) => {
-  lastActivityTime = Date.now(); // Update the last activity time on any event
+// Ensure mainWindow is initialized before sending updates
+app.on('ready', () => {
+  mainWindow = new BrowserWindow({
+    width: 800,
+    height: 600,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
 
-  if (event.state === 'DOWN') {
-    if (event.name.startsWith('Key')) {
-      keystrokes++;
-      mainWindow.webContents.send('keystroke-update', keystrokes); // Send keystroke count to renderer
-    } else if (event.name === 'MouseLeft') {
-      mouseClicks++;
-      mainWindow.webContents.send('mouseclick-update', mouseClicks); // Send mouse click count to renderer
+  mainWindow.loadFile('index.html');
+
+  console.log('Main window loaded. Initializing global keyboard listener.');
+
+  // Replace Python tracking with node-global-key-listener
+  gkl.addListener((event) => {
+    console.log(`Event received: ${JSON.stringify(event)}`); // Log all events for debugging
+    lastActivityTime = Date.now(); // Update the last activity time on any event
+
+    if (event.state === 'DOWN') {
+      if (event.name.startsWith('Key') || event.rawKey?.standardName?.startsWith('KEY')) {
+        keystrokes++;
+        console.log(`Key pressed: ${event.name || event.rawKey.standardName}, Total keystrokes: ${keystrokes}`); // Log key press
+        mainWindow.webContents.send('keystroke-update', keystrokes); // Send keystroke count to renderer
+      } else if (event.name === 'MOUSE LEFT' || event.name === 'MOUSE RIGHT') {
+        mouseClicks++;
+        console.log(`Mouse clicked: ${event.name}, Total mouse clicks: ${mouseClicks}`); // Log mouse click
+        mainWindow.webContents.send('mouseclick-update', mouseClicks); // Send mouse click count to renderer
+      }
+    } else if (event.name === 'MOUSE MOVE') {
+      mouseMovements++;
+      console.log(`Mouse moved, Total mouse movements: ${mouseMovements}`); // Log mouse movement
+      mainWindow.webContents.send('mousemove-update', mouseMovements); // Send mouse movement count to renderer
     }
-  } else if (event.name === 'MouseMove') {
-    mouseMovements++;
-    mainWindow.webContents.send('mousemove-update', mouseMovements); // Send mouse movement count to renderer
-  }
-}); // Added missing closing parenthesis
+  });
+
+  console.log('Global keyboard listener initialized.');
+});
 
 // Determine the writable database path
 const userDataPath = app.getPath('userData'); // Get a writable directory
@@ -260,19 +282,6 @@ db.serialize(() => {
       console.log('Unique index on id in projects table removed (if it existed).');
     }
   });
-});
-
-app.on('ready', () => {
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  });
-
-  mainWindow.loadFile('index.html');
 });
 
 // Directory to save screenshots
