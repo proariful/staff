@@ -401,17 +401,15 @@ function takeScreenshot() {
 }
 
 // Function to upload screenshots to the server
-ipcMain.on('upload-screenshots', async (event) => {
+async function uploadScreenshots() {
   db.all(`SELECT * FROM screenshots WHERE status = 0`, [], async (err, rows) => {
     if (err) {
       console.error('Error fetching screenshots:', err.message);
-      event.reply('upload-screenshots-response', { success: false, message: 'Error fetching screenshots.' }); // Send error response
       return;
     }
 
     if (rows.length === 0) {
       console.log('No screenshots with status 0 to upload.');
-      event.reply('upload-screenshots-response', { success: true, message: 'No screenshots to upload.' }); // Send success response with no screenshots
       return;
     }
 
@@ -427,7 +425,7 @@ ipcMain.on('upload-screenshots', async (event) => {
     });
 
     if (!userToken) {
-      event.reply('upload-screenshots-response', { success: false, message: 'User is not logged in.' }); // Send error response for missing token
+      console.error('User is not logged in. Cannot upload screenshots.');
       return;
     }
 
@@ -469,15 +467,14 @@ ipcMain.on('upload-screenshots', async (event) => {
         console.error('Error details:', error.response?.data || error.message);
       }
     }
-
   });
-});
+}
 
 // Set an interval to upload screenshots every 30 minutes
 setInterval(() => {
   console.log('Uploading screenshots at 30-minute interval...');
   uploadScreenshots();
-}, 30 * 60 * 1000); // 30 minutes in milliseconds
+}, 3 * 60 * 1000); // 30 minutes in milliseconds
 
 // Start taking screenshots every minute
 setInterval(takeScreenshot, 1 * 60 * 1000); // Take a screenshot every 3 minutes
