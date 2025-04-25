@@ -953,6 +953,18 @@ ipcMain.on('send-tracking-data', (event) => {
   });
 });
 
+// Handle fetching the status of a selected project
+ipcMain.on('get-project-status', (event, { projectId }) => {
+  db.get(`SELECT status FROM projects WHERE project_id = ?`, [projectId], (err, row) => {
+    if (err) {
+      console.error('Error retrieving project status:', err.message);
+      event.reply('project-status-response', { status: 0 }); // Default to inactive if there's an error
+    } else {
+      event.reply('project-status-response', { status: row ? row.status : 0 }); // Send the status (default to 0 if not found)
+    }
+  });
+});
+
 app.on('window-all-closed', () => {
   if (timerInterval) {
     console.log('App is closing. Stopping timer and saving tracking data.');

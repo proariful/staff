@@ -395,9 +395,27 @@
     const stopButton = document.getElementById('stop-button');
 
     startButton.addEventListener('click', () => {
-      ipcRenderer.send('start-tracking');
-      startButton.style.display = 'none'; // Hide the Start button
-      stopButton.style.display = 'inline-block'; // Show the Stop button
+      const projectDropdown = document.getElementById('project-dropdown');
+      const selectedProjectId = projectDropdown.value;
+      const selectedProjectName = projectDropdown.options[projectDropdown.selectedIndex]?.text;
+
+      if (!selectedProjectId) {
+        alert('Please select a project before starting the timer.');
+        return;
+      }
+
+      // Check the status of the selected project
+      ipcRenderer.send('get-project-status', { projectId: selectedProjectId });
+
+      ipcRenderer.once('project-status-response', (event, { status }) => {
+        if (status === 1) {
+          ipcRenderer.send('start-tracking');
+          document.getElementById('start-button').style.display = 'none'; // Hide the Start button
+          document.getElementById('stop-button').style.display = 'inline-block'; // Show the Stop button
+        } else {
+          alert(`The selected project "${selectedProjectName}" is not active. Please select an active project.`);
+        }
+      });
     });
 
     stopButton.addEventListener('click', () => {
