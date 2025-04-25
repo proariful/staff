@@ -16,7 +16,7 @@ let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
-const INACTIVITY_LIMIT = 1 * 60 * 1000; // 1 minute in milliseconds
+const INACTIVITY_LIMIT = 9 * 60 * 1000; // 1 minute in milliseconds
 let nextInsertTime = null; // Track the next system time for data insertion
 let inactivityNotified = false; // Flag to track if inactivity notification has been sent
 
@@ -26,7 +26,7 @@ const gkl = new GlobalKeyboardListener();
 // Ensure mainWindow is initialized before sending updates
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
-    width: 800,
+    width: 600,
     height: 600,
     webPreferences: {
       nodeIntegration: true,
@@ -113,7 +113,8 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       firstName TEXT NOT NULL,
-      lastName TEXT NOT NULL
+      lastName TEXT NOT NULL,
+      selected_project_id INTEGER DEFAULT NULL
     )
   `, (err) => {
     if (err) {
@@ -122,14 +123,7 @@ db.serialize(() => {
   });
 });
 
-// Add a column for selected_project_id if it doesn't exist
-db.run(`
-  ALTER TABLE users ADD COLUMN selected_project_id INTEGER
-`, (err) => {
-  if (err && !err.message.includes('duplicate column')) {
-    console.error('Error adding selected_project_id column:', err.message);
-  }
-});
+
 
 // Create the `login_data` table if it doesn't exist
 db.serialize(() => {
@@ -152,18 +146,7 @@ db.serialize(() => {
   });
 });
 
-// Update the `login_data` table to include a `token` column
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE login_data ADD COLUMN token TEXT
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding token column to login_data table:', err.message);
-    } else {
-      console.log('Token column added to login_data table or already exists.');
-    }
-  });
-});
+
 
 // Create the `tracking` table if it doesn't exist
 db.serialize(() => {
@@ -174,7 +157,12 @@ db.serialize(() => {
       timerseconds INTEGER NOT NULL,
       keystrokes INTEGER NOT NULL,
       mousemovement INTEGER NOT NULL,
-      mouseclick INTEGER NOT NULL
+      mouseclick INTEGER NOT NULL,
+      screenshots TEXT,
+      project_id INTEGER,
+      project_name TEXT,
+      user_id INTEGER,
+      status INTEGER DEFAULT 0
     )
   `, (err) => {
     if (err) {
@@ -183,74 +171,18 @@ db.serialize(() => {
   });
 });
 
-// Update the `tracking` table to include a `screenshots` column
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE tracking ADD COLUMN screenshots TEXT
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding screenshots column to tracking table:', err.message);
-    } else {
-      console.log('Screenshots column added to tracking table or already exists.');
-    }
-  });
-});
 
-// Update the `tracking` table to include `project_id` and `name` columns
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE tracking ADD COLUMN project_id INTEGER
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding project_id column to tracking table:', err.message);
-    } else {
-      console.log('project_id column added to tracking table or already exists.');
-    }
-  });
 
-  db.run(`
-    ALTER TABLE tracking ADD COLUMN project_name TEXT
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding project_name column to tracking table:', err.message);
-    } else {
-      console.log('project_name column added to tracking table or already exists.');
-    }
-  });
-});
 
-// Update the `tracking` table to include `user_id` column
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE tracking ADD COLUMN user_id INTEGER
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding user_id column to tracking table:', err.message);
-    } else {
-      console.log('user_id column added to tracking table or already exists.');
-    }
-  });
-});
 
-// Update the `tracking` table to include a `status` column
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE tracking ADD COLUMN status INTEGER DEFAULT 0
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding status column to tracking table:', err.message);
-    } else {
-      console.log('Status column added to tracking table or already exists.');
-    }
-  });
-});
+
 
 // Create the `projects` table if it doesn't exist
 db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      project_id INTEGER NOT NULL,
+      project_id INTEGER NOT NULL UNIQUE,
       name TEXT NOT NULL,
       employee_id INTEGER NOT NULL,
       assigned_at TEXT NOT NULL,
@@ -265,44 +197,7 @@ db.serialize(() => {
   });
 });
 
-// Ensure the `selected_project_id` column exists in the `projects` table
-db.serialize(() => {
-  db.run(`
-    ALTER TABLE projects ADD COLUMN selected_project_id INTEGER DEFAULT NULL
-  `, (err) => {
-    if (err && !err.message.includes('duplicate column name')) {
-      console.error('Error adding selected_project_id column to projects table:', err.message);
-    } else {
-      console.log('selected_project_id column added to projects table or already exists.');
-    }
-  });
-});
 
-// Ensure the `project_id` column is unique in the `projects` table
-db.serialize(() => {
-  db.run(`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_project_id ON projects (project_id)
-  `, (err) => {
-    if (err) {
-      console.error('Error creating unique index on project_id:', err.message);
-    } else {
-      console.log('Unique index on project_id created or already exists.');
-    }
-  });
-});
-
-// Remove the unique constraint on the `id` column (if previously added)
-db.serialize(() => {
-  db.run(`
-    DROP INDEX IF EXISTS idx_projects_id
-  `, (err) => {
-    if (err) {
-      console.error('Error dropping unique index on id in projects table:', err.message);
-    } else {
-      console.log('Unique index on id in projects table removed (if it existed).');
-    }
-  });
-});
 
 // Create the `screenshots` table if it doesn't exist
 db.serialize(() => {
