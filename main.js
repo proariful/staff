@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Notification, shell } = require('electron'); // Import shell to open folders
+const { app, BrowserWindow, ipcMain, Notification, shell, Menu } = require('electron'); // Import shell to open folders and Menu to customize the app menu
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
@@ -27,7 +27,7 @@ const gkl = new GlobalKeyboardListener();
 app.on('ready', () => {
   mainWindow = new BrowserWindow({
     width: 600,
-    height: 600,
+    height: 550,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -36,7 +36,10 @@ app.on('ready', () => {
 
   mainWindow.loadFile('index.html');
 
-  console.log('Main window loaded. Initializing global keyboard listener.');
+  // Disable the default menu
+  Menu.setApplicationMenu(null);
+
+  console.log('Main window loaded. Default menu removed. Initializing global keyboard listener.');
 
   // Function to handle keyboard clicks
   function handleKeyboardClick(event) {
