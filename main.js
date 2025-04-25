@@ -474,10 +474,10 @@ async function uploadScreenshots() {
 setInterval(() => {
   console.log('Uploading screenshots at 30-minute interval...');
   uploadScreenshots();
-}, 3 * 60 * 1000); // 30 minutes in milliseconds
+}, 15 * 60 * 1000); // 30 minutes in milliseconds
 
 // Start taking screenshots every minute
-setInterval(takeScreenshot, 1 * 60 * 1000); // Take a screenshot every 3 minutes
+setInterval(takeScreenshot, 3 * 60 * 1000); // Take a screenshot every 3 minutes
 
 // Function to calculate the next 1-minute interval (for local testing)
 function calculateNextInsertTime() {
@@ -701,7 +701,7 @@ function sendTrackingData() {
 setInterval(() => {
   console.log('Sending tracking data at 30-minute interval...');
   sendTrackingData();
-}, 30 * 60 * 1000); // 30 minutes in milliseconds
+}, 15 * 60 * 1000); // 30 minutes in milliseconds
 
 // Function to format ISO date to MySQL DATETIME format
 function formatToMySQLDateTime(isoDate) {
