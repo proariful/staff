@@ -5,44 +5,212 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Bissoy Staff Manager</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+
+    header {
+      color: #333;
+      text-align: center;
+    }
+
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #333;
+      color: white;
+      padding: 10px 10px;
+    }
+
+    nav span {
+      font-size: 18px;
+    }
+
+    nav button {
+      background-color: #f44336;
+      color: white;
+      border: none;
+      padding:5px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    nav button:hover {
+      background-color: #d32f2f;
+    }
+
+    section {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      padding: 10px;
+    }
+
+    h3 {
+      text-align: center;
+      color: #4CAF50;
+      padding: 5px;
+      margin: 0px;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    form label {
+      font-weight: bold;
+    }
+
+    form input {
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    form button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    form button:hover {
+      background-color: #45a049;
+    }
+
+    select {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    button#start-button {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    button#stop-button {
+      background-color: #f44336;
+      color: white;
+    }
+
+    button#reports-button {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    table th, table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+
+    table th {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    #login-message {
+      text-align: center;
+      font-weight: bold;
+    }
+
+    #selected-project-message {
+      text-align: center;
+      font-weight: bold;
+    }
+
+    #active-times-display h3 {
+      margin-bottom: 10px;
+    }
+
+    #active-times-display p {
+      margin: 5px 0;
+    }
+
+    #reports-section {
+      overflow-x: auto;
+    }
+
+    #reports-table img {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+
+  </style>
 </head>
 <body>
-  <h2 style="text-align: center;">Welcome to the Bissoy Staff Manager</h2>
-  <nav id="nav-bar" style="display: flex; justify-content: space-between; align-items: center;">
+  <header>
+    <h3>Bissoy Staff Manager</h3>
+  </header>
+  <nav id="nav-bar">
     <!-- Welcome message and logout button will be dynamically added here -->
   </nav>
   <section id="login-section">
+    <h3>Login</h3>
     <form id="login-form">
       <label for="username">Username:</label>
       <input type="text" id="username" name="username" required>
-      <br>
       <label for="password">Password:</label>
       <input type="password" id="password" name="password" required>
-      <br>
       <button type="submit">Login</button>
     </form>
     <p id="login-message"></p>
   </section>
   <section id="view-users-section" style="display: none;">
-    <h2>All Users</h2>
+    <h3>All Users</h3>
     <ul id="user-list"></ul>
   </section>
-  <section id="project-section" style="display: none; margin-top: 20px; text-align: center;">
-    <h2>Assigned Projects</h2>
-    <select id="project-dropdown" style="font-size: 22px; margin: 0 auto; display: block;">
+  <section id="project-section" style="display: none;">
+    <h3>Assigned Projects</h3>
+    <select id="project-dropdown">
       <option value="" disabled selected>Select a project</option>
     </select>
-    <p id="selected-project-message" style="margin-top: 10px; color: green;"></p>
+    <p id="selected-project-message"></p>
   </section>
-  <section id="timer-section" style="display: none; text-align: center; margin-top: 20px;">
-    <button id="start-button" style="font-size:28px;">Start</button>
+  <section id="timer-section" style="display: none;">
+    <h3>Timer</h3>
+    <button id="start-button">Start</button>
     <button id="stop-button" style="display: none;">Stop</button>
     <button id="reports-button" style="display: none;">Reports</button>
-    <p id="timer-display" style="font-size: 24px; margin-top: 10px;">00:00</p>
-    <p id="keystroke-display" style="font-size: 18px; margin-top: 10px;display: none;">Keystrokes: 0</p>
-    <p id="mouse-movement-display" style="font-size: 18px; margin-top: 10px;display: none;">Mouse Movements: 0</p>
-    <p id="mouse-click-display" style="font-size: 18px; margin-top: 10px;display: none;">Mouse Clicks: 0</p>
-    <div id="active-times-display" style="font-size: 18px; margin-top: 20px;">
+    <p id="timer-display">00:00</p>
+    <p id="keystroke-display" style="display: none;">Keystrokes: 0</p>
+    <p id="mouse-movement-display" style="display: none;">Mouse Movements: 0</p>
+    <p id="mouse-click-display" style="display: none;">Mouse Clicks: 0</p>
+    <div id="active-times-display">
       <h3>Total Active Times</h3>
       <p id="today-active-time">Today: 0h 0m</p>
       <p id="yesterday-active-time">Yesterday: 0h 0m</p>
@@ -51,12 +219,12 @@
       <p id="lastmonth-active-time">Last Month: 0h 0m</p>
     </div>
   </section>
-  <button id="send-tracking-data-button" style="margin-bottom: 10px;display: none;">Send Tracking Data to Server</button>
+  <button id="send-tracking-data-button" style="display: none;">Send Tracking Data to Server</button>
   <button id="upload-images-btn" style="display: none;">Upload Screenshots</button>
-  <section id="reports-section" style="display: none; margin-top: 20px;">
-    <h2>Tracking Reports</h2>
-    <p id="send-tracking-data-message" style="color: green;"></p>
-    <table id="reports-table" border="1" style="width: 100%; text-align: left; display: none;">
+  <section id="reports-section" style="display: none;">
+    <h3>Tracking Reports</h3>
+    <p id="send-tracking-data-message"></p>
+    <table id="reports-table" style="display: none;">
       <thead>
         <tr>
           <th>ID</th>
@@ -67,7 +235,7 @@
           <th>Mouse Clicks</th>
           <th>Project ID</th>
           <th>Project Name</th>
-          <th>User ID</th> <!-- Added column for user ID -->
+          <th>User ID</th>
           <th>Screenshots</th>
         </tr>
       </thead>
@@ -76,7 +244,6 @@
       </tbody>
     </table>
   </section>
-  
   <script>
     const { ipcRenderer } = require('electron');
     let loggedInUser = null;
