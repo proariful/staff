@@ -304,6 +304,9 @@
       });
 
       document.getElementById('project-section').style.display = 'block'; // Show the project section
+
+      // Fetch and display the previously selected project
+      ipcRenderer.send('get-selected-project'); // Ensure the previously selected project is displayed
     });
 
     // Automatically save the selected project when the dropdown value changes
@@ -322,7 +325,7 @@
       if (selectedProject) {
         const projectDropdown = document.getElementById('project-dropdown');
         projectDropdown.value = selectedProject.projectId; // Set the dropdown value to the saved project ID
-       
+        document.getElementById('selected-project-message').textContent = `Selected Project: ${selectedProject.projectName}`; // Display the selected project name
       }
     });
 
