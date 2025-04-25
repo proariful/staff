@@ -16,7 +16,7 @@ let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
-const INACTIVITY_LIMIT = 9 * 60 * 1000; // 1 minute in milliseconds
+const INACTIVITY_LIMIT = 1 * 60 * 1000; // 1 minute in milliseconds
 let nextInsertTime = null; // Track the next system time for data insertion
 let inactivityNotified = false; // Flag to track if inactivity notification has been sent
 
@@ -561,33 +561,50 @@ function checkInactivity() {
       // Stop the timer and tracking
       stopTimer();
 
-      // Insert tracking data into the database
-      const startTime = new Date().toISOString(); // Use current time if no start time is available
-      db.run(`
-        INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotNames.join(',')], (err) => {
-        if (err) {
-          console.error('Error inserting tracking data on inactivity:', err.message);
-        } else {
-          console.log('Tracking data saved successfully on inactivity.');
+      // Fetch the currently logged-in user and selected project
+      db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
+        if (err || !userRow) {
+          console.error('Error retrieving user_id:', err ? err.message : 'No user logged in.');
+          return;
         }
 
-        // Reset counters and screenshot names
-        resetCounters();
-        screenshotNames = [];
+        const loggedInUserId = userRow.user_id;
 
-        // Notify the renderer process to toggle the "Stop" button
-        mainWindow.webContents.send('inactivity-detected');
+        db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
+          const selectedProjectId = projectRow ? projectRow.project_id : null;
+          const selectedProjectName = projectRow ? projectRow.name : null;
 
-        // Send a notification
-        new Notification({
-          title: 'Inactivity Detected',
-          body: 'Timer stopped due to inactivity. Data has been saved.',
-        }).show();
+          // Insert tracking data into the database
+          const startTime = new Date().toISOString(); // Use current time if no start time is available
+          db.run(
+            `INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotNames.join(','), selectedProjectId, selectedProjectName, loggedInUserId],
+            (err) => {
+              if (err) {
+                console.error('Error inserting tracking data on inactivity:', err.message);
+              } else {
+                console.log('Tracking data saved successfully on inactivity.');
+              }
 
-        // Set the flag to prevent duplicate notifications
-        inactivityNotified = true;
+              // Reset counters and screenshot names
+              resetCounters();
+              screenshotNames = [];
+
+              // Notify the renderer process to toggle the "Stop" button
+              mainWindow.webContents.send('inactivity-detected');
+
+              // Send a notification
+              new Notification({
+                title: 'Inactivity Detected',
+                body: 'Timer stopped due to inactivity. Data has been saved.',
+              }).show();
+
+              // Set the flag to prevent duplicate notifications
+              inactivityNotified = true;
+            }
+          );
+        });
       });
     }
   } else {
