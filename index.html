@@ -259,19 +259,27 @@
         if (response.data.status === 'success') {
           const projects = response.data.data;
           const projectDropdown = document.getElementById('project-dropdown');
+          const projectSection = document.getElementById('project-section');
+          const loadingMessage = document.createElement('p');
+          loadingMessage.textContent = 'Loading projects...';
+          loadingMessage.style.color = 'blue';
+          projectSection.appendChild(loadingMessage); // Show loading message
+
           projectDropdown.innerHTML = '<option value="" disabled selected>Select a project</option>'; // Reset dropdown
 
+          console.log('Projects fetched from API:', projects);
           projects.forEach((project) => {
             const option = document.createElement('option');
             option.value = project.project_id;
-            option.textContent = project.name; // Only display the project name
+            option.textContent = `${project.name} (${project.status === 1 ? 'Active' : 'Inactive'})`; // Display status
             projectDropdown.appendChild(option);
           });
 
+          loadingMessage.remove(); // Remove loading message
           document.getElementById('project-section').style.display = 'block'; // Show the project section
 
-          // Send project data to the main process for storage
-          ipcRenderer.send('store-projects', projects);
+          console.log('Sending projects to main process for storage...');
+          ipcRenderer.send('store-projects', projects); // Update database with new data
 
           // Fetch and display the previously selected project
           ipcRenderer.send('get-selected-project');
@@ -283,22 +291,19 @@
       }
     }
 
-    // Handle offline projects when the app is reopened
     ipcRenderer.on('projects-data', (event, projects) => {
+      console.log('Projects received from database:', projects);
       const projectDropdown = document.getElementById('project-dropdown');
       projectDropdown.innerHTML = '<option value="" disabled selected>Select a project</option>'; // Reset dropdown
 
       projects.forEach((project) => {
         const option = document.createElement('option');
         option.value = project.project_id;
-        option.textContent = project.name; // Only display the project name
+        option.textContent = `${project.name} (${project.status === 1 ? 'Active' : 'Inactive'})`; // Display status
         projectDropdown.appendChild(option);
       });
 
       document.getElementById('project-section').style.display = 'block'; // Show the project section
-
-      // Fetch and display the previously selected project
-      ipcRenderer.send('get-selected-project');
     });
 
     // Automatically save the selected project when the dropdown value changes
@@ -460,19 +465,14 @@
           // Save user data and token to the local database
           ipcRenderer.send('save-login-data', loggedInUser);
 
-          // Fetch projects after login
-          await fetchProjects();
+          // Fetch projects from the API and replace the local database
+          const projectsResponse = await axios.get('https://www.bissoy.com/api/projects', {
+            headers: { Authorization: `Bearer ${loggedInUser.token}` },
+          });
 
-          // Display user data
-          const userDataSection = document.createElement('section');
-          userDataSection.innerHTML = `
-            <h3>User Details</h3>
-            <img src="${loggedInUser.profile_picture}" alt="Profile Picture" width="100">
-            <p><strong>Full Name:</strong> ${loggedInUser.full_name}</p>
-            <p><strong>Username:</strong> ${loggedInUser.username}</p>
-            <p><strong>Email:</strong> ${loggedInUser.email}</p>
-          `;
-          document.body.appendChild(userDataSection);
+          if (projectsResponse.data.status === 'success') {
+            ipcRenderer.send('store-projects', projectsResponse.data.data); // Replace projects in the database
+          }
 
           // Update UI
           updateUI();
@@ -480,16 +480,12 @@
           messageElement.textContent = result.message || 'Login failed!';
           messageElement.style.color = 'red';
         }
-
-        console.log('API Response:', result); // Log the API response
       } catch (error) {
         const messageElement = document.getElementById('login-message');
         if (error.response) {
           messageElement.textContent = error.response.data.message || 'Login failed!';
-          console.error('API Error Response:', error.response.data); // Log error response
         } else {
           messageElement.textContent = 'An error occurred. Please try again.';
-          console.error('Error:', error.message); // Log general error
         }
         messageElement.style.color = 'red';
       }

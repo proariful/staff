@@ -126,8 +126,6 @@ db.serialize(() => {
   });
 });
 
-
-
 // Create the `login_data` table if it doesn't exist
 db.serialize(() => {
   db.run(`
@@ -148,8 +146,6 @@ db.serialize(() => {
     }
   });
 });
-
-
 
 // Create the `tracking` table if it doesn't exist
 db.serialize(() => {
@@ -174,12 +170,6 @@ db.serialize(() => {
   });
 });
 
-
-
-
-
-
-
 // Create the `projects` table if it doesn't exist
 db.serialize(() => {
   db.run(`
@@ -189,6 +179,7 @@ db.serialize(() => {
       name TEXT NOT NULL,
       employee_id INTEGER NOT NULL,
       assigned_at TEXT NOT NULL,
+      status INTEGER DEFAULT 0, 
       selected_project_id INTEGER DEFAULT NULL
     )
   `, (err) => {
@@ -199,8 +190,6 @@ db.serialize(() => {
     }
   });
 });
-
-
 
 // Create the `screenshots` table if it doesn't exist
 db.serialize(() => {
@@ -702,39 +691,61 @@ ipcMain.on('logout-user', () => {
 
 // Handle storing projects fetched from the API
 ipcMain.on('store-projects', (event, projects) => {
-  const insertStmt = db.prepare(`
-    INSERT OR IGNORE INTO projects (project_id, name, employee_id, assigned_at)
-    VALUES (?, ?, ?, ?)
-  `);
+  console.log('Clearing existing projects from the database...');
+  db.run(`DELETE FROM projects`, (err) => {
+    if (err) {
+      console.error('Error clearing projects table:', err.message);
+      return;
+    }
 
-  projects.forEach((project) => {
-    insertStmt.run(
-      project.project_id,
-      project.name,
-      project.employee_id,
-      project.assigned_at,
-      (err) => {
-        if (err) {
-          console.error('Error inserting project:', err.message);
+    console.log('Projects table cleared.');
+
+    console.log('Storing new projects from API:', projects);
+    const insertStmt = db.prepare(`
+      INSERT INTO projects (project_id, name, employee_id, assigned_at, status)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    projects.forEach((project) => {
+      insertStmt.run(
+        project.project_id,
+        project.name,
+        project.employee_id,
+        project.assigned_at,
+        project.status, // Store status directly without conversion
+        (err) => {
+          if (err) {
+            console.error('Error inserting project:', err.message);
+          }
         }
-      }
-    );
-  });
+      );
+    });
 
-  insertStmt.finalize(() => {
-    console.log('Projects saved successfully.');
+    insertStmt.finalize(() => {
+      console.log('New projects stored successfully in the database.');
+
+      console.log('Fetching updated projects from the database...');
+      db.all(`SELECT project_id, name, status FROM projects`, [], (err, rows) => {
+        if (err) {
+          console.error('Error fetching updated projects:', err.message);
+        } else {
+          console.log('Fetched updated projects from database:', rows);
+          event.sender.send('projects-data', rows); // Send updated projects to renderer
+        }
+      });
+    });
   });
 });
 
 // Handle fetching projects (online or offline)
 ipcMain.on('fetch-projects', (event) => {
-  db.all(`SELECT project_id, name FROM projects`, [], (err, rows) => {
+  db.all(`SELECT project_id, name, status FROM projects`, [], (err, rows) => { // Include status column
     if (err) {
       console.error('Error fetching projects from database:', err.message);
       event.reply('projects-data', []);
     } else {
       console.log('Fetched projects from database:', rows);
-      event.reply('projects-data', rows);
+      event.reply('projects-data', rows); // Send projects with status to renderer
     }
   });
 });
