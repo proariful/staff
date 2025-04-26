@@ -25,6 +25,8 @@ const gkl = new GlobalKeyboardListener();
 
 // Ensure mainWindow is initialized before sending updates
 app.on('ready', () => {
+  app.setAppUserModelId('com.bissoystaff.manager'); // Set the app user model ID to match your appId in package.json
+
   const iconPath = app.isPackaged
     ? path.join(process.resourcesPath, 'assets', 'icon.ico') // Path for packaged app
     : path.join(__dirname, 'assets', 'icon.ico'); // Path for development
