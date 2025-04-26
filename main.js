@@ -25,13 +25,18 @@ const gkl = new GlobalKeyboardListener();
 
 // Ensure mainWindow is initialized before sending updates
 app.on('ready', () => {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'assets', 'icon.ico') // Path for packaged app
+    : path.join(__dirname, 'assets', 'icon.ico'); // Path for development
+
   mainWindow = new BrowserWindow({
     width: 600,
-    height: 550,
+    height: 580,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
     },
+    icon: iconPath // Set the app icon
   });
 
   mainWindow.loadFile('index.html');

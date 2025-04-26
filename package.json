@@ -42,7 +42,8 @@
       "index.html",
       "main.js",
       "user_data.db",
-      "src/**/*"
+      "src/**/*",
+      "assets/**/*"
     ],
     "extraResources": [
       {
@@ -52,7 +53,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "icon.ico"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
