@@ -16,7 +16,10 @@ let keystrokes = 0;
 let mouseMovements = 0;
 let mouseClicks = 0;
 let lastActivityTime = Date.now(); // Track the last activity time
-const INACTIVITY_LIMIT = 9 * 60 * 1000; // 1 minute in milliseconds
+const INACTIVITY_LIMIT = 9 * 60 * 1000; // 10 minutes in milliseconds
+const SEND_TRACKING_DATA = 15 * 60 * 1000; // 15 minutes in milliseconds
+const SEND_SCREENSHOT = 15 * 60 * 1000; // 15 minutes in milliseconds
+const TAKE_SCREENSHOT = 3 * 60 * 1000; // 3 minutes in milliseconds
 let nextInsertTime = null; // Track the next system time for data insertion
 let inactivityNotified = false; // Flag to track if inactivity notification has been sent
 
@@ -47,6 +50,14 @@ app.on('ready', () => {
   Menu.setApplicationMenu(null);
 
   console.log('Main window loaded. Default menu removed. Initializing global keyboard listener.');
+
+  // Reset "always-on-top" when the user interacts with the app
+  mainWindow.on('focus', () => {
+    if (mainWindow.isAlwaysOnTop()) {
+      mainWindow.setAlwaysOnTop(false); // Reset the always-on-top setting
+      console.log('Always-on-top reset due to user interaction.');
+    }
+  });
 
   // Function to handle keyboard clicks
   function handleKeyboardClick(event) {
@@ -376,14 +387,14 @@ async function uploadScreenshots() {
   });
 }
 
-// Set an interval to upload screenshots every 30 minutes
+// Set an interval to upload screenshots
 setInterval(() => {
-  console.log('Uploading screenshots at 30-minute interval...');
+  console.log('Uploading screenshots at interval...');
   uploadScreenshots();
-}, 15 * 60 * 1000); // 30 minutes in milliseconds
+}, SEND_SCREENSHOT);
 
-// Start taking screenshots every minute
-setInterval(takeScreenshot, 3 * 60 * 1000); // Take a screenshot every 3 minutes
+// Start taking screenshots at the defined interval
+setInterval(takeScreenshot, TAKE_SCREENSHOT);
 
 // Function to calculate the next 1-minute interval (for local testing)
 function calculateNextInsertTime() {
@@ -470,11 +481,49 @@ function checkInactivity() {
       // Notify the renderer process to toggle the "Stop" button
       mainWindow.webContents.send('inactivity-detected');
 
-      // Send a notification
-      new Notification({
-        title: 'Inactivity Detected',
-        body: 'Timer stopped due to inactivity. Data has been saved.',
-      }).show();
+      // Show a modal popup to alert the user
+      const alertWindow = new BrowserWindow({
+        parent: mainWindow,
+        modal: true,
+        show: false,
+        width: 400,
+        height: 200,
+        resizable: false,
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false,
+        },
+      });
+
+      alertWindow.loadURL(`data:text/html,
+        <html>
+          <head>
+            <title>Timer Stopped</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+              button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+            </style>
+          </head>
+          <body>
+            <h2>Timer Stopped</h2>
+            <p>The timer has stopped due to inactivity.</p>
+            <button onclick="require('electron').ipcRenderer.send('close-popup')">Close</button>
+          </body>
+        </html>`);
+
+      alertWindow.once('ready-to-show', () => {
+        alertWindow.show();
+      });
+
+      // Handle the close-popup event to close the popup
+      ipcMain.once('close-popup', () => {
+        if (alertWindow) {
+          alertWindow.close(); // Close the popup
+        }
+        console.log('Popup closed by the user.');
+      });
 
       // Set the flag to prevent duplicate notifications
       inactivityNotified = true;
@@ -486,7 +535,7 @@ function checkInactivity() {
 }
 
 // Ensure `checkInactivity` is called regularly
-setInterval(checkInactivity, 1000); // Check for inactivity every second
+setInterval(checkInactivity, INACTIVITY_LIMIT / 10); // Check for inactivity every second
 
 // Function to start the timer
 function startTimer() {
@@ -586,11 +635,11 @@ function sendTrackingData() {
   });
 }
 
-// Set an interval to send tracking data every 30 minutes
+// Set an interval to send tracking data
 setInterval(() => {
-  console.log('Sending tracking data at 30-minute interval...');
+  console.log('Sending tracking data at interval...');
   sendTrackingData();
-}, 15 * 60 * 1000); // 30 minutes in milliseconds
+}, SEND_TRACKING_DATA);
 
 // Function to format ISO date to MySQL DATETIME format
 function formatToMySQLDateTime(isoDate) {
