@@ -79,8 +79,13 @@ app.on('ready', () => {
   gkl.addListener((event) => {
     if (!timerInterval) return; // Only count events when the timer is running
 
-    console.log(`Event received: ${JSON.stringify(event)}`); // Log all events for debugging
-    lastActivityTime = Date.now(); // Update the last activity time on any event
+    // Log all events for debugging
+    console.log(`Event received: ${JSON.stringify(event)}`);
+
+    // Update the last activity time on any event
+    if (event.state === 'DOWN' || event.name === 'MOUSE MOVE') {
+      lastActivityTime = Date.now(); // Ensure this is updated for both keyboard and mouse events
+    }
 
     if (event.state === 'DOWN') {
       handleKeyboardClick(event); // Handle keyboard clicks
@@ -249,6 +254,8 @@ function takeScreenshot() {
 
     screenshot()
       .then((imgBuffer) => {
+        console.log('Screenshot captured successfully. Proceeding with compression.');
+
         // Compress the screenshot directly from the buffer
         sharp(imgBuffer)
           .resize(1280, 720) // Resize to 1280x720 (optional, adjust as needed)
@@ -290,6 +297,11 @@ function takeScreenshot() {
       })
       .catch((err) => {
         console.error('Error taking screenshot:', err.message);
+
+        // Additional logging for Windows 11 compatibility
+        if (os.platform() === 'win32' && os.release().startsWith('10.0.')) {
+          console.error('Detected Windows 11. Ensure screenshot-desktop has the necessary permissions.');
+        }
       });
   });
 }
@@ -455,51 +467,17 @@ function checkInactivity() {
       // Stop the timer and tracking
       stopTimer();
 
-      // Fetch the currently logged-in user and selected project
-      db.get(`SELECT user_id FROM login_data WHERE id = 1`, [], (err, userRow) => {
-        if (err || !userRow) {
-          console.error('Error retrieving user_id:', err ? err.message : 'No user logged in.');
-          return;
-        }
+      // Notify the renderer process to toggle the "Stop" button
+      mainWindow.webContents.send('inactivity-detected');
 
-        const loggedInUserId = userRow.user_id;
+      // Send a notification
+      new Notification({
+        title: 'Inactivity Detected',
+        body: 'Timer stopped due to inactivity. Data has been saved.',
+      }).show();
 
-        db.get(`SELECT project_id, name FROM projects WHERE selected_project_id = 1`, [], (err, projectRow) => {
-          const selectedProjectId = projectRow ? projectRow.project_id : null;
-          const selectedProjectName = projectRow ? projectRow.name : null;
-
-          // Insert tracking data into the database
-          const startTime = new Date().toISOString(); // Use current time if no start time is available
-          db.run(
-            `INSERT INTO tracking (starttime, timerseconds, keystrokes, mousemovement, mouseclick, screenshots, project_id, project_name, user_id)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [startTime, timerSeconds, keystrokes, mouseMovements, mouseClicks, screenshotNames.join(','), selectedProjectId, selectedProjectName, loggedInUserId],
-            (err) => {
-              if (err) {
-                console.error('Error inserting tracking data on inactivity:', err.message);
-              } else {
-                console.log('Tracking data saved successfully on inactivity.');
-              }
-
-              // Reset counters and screenshot names
-              resetCounters();
-              screenshotNames = [];
-
-              // Notify the renderer process to toggle the "Stop" button
-              mainWindow.webContents.send('inactivity-detected');
-
-              // Send a notification
-              new Notification({
-                title: 'Inactivity Detected',
-                body: 'Timer stopped due to inactivity. Data has been saved.',
-              }).show();
-
-              // Set the flag to prevent duplicate notifications
-              inactivityNotified = true;
-            }
-          );
-        });
-      });
+      // Set the flag to prevent duplicate notifications
+      inactivityNotified = true;
     }
   } else {
     // Reset the flag if activity is detected
